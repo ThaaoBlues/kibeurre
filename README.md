@@ -9,7 +9,8 @@ Kibeurre is a naive kyber implementation written in Rust. The goal of this proje
 Contains all basic vector and matrices operations in Z/qZ :
 - vectors addition
 - vector scalar multiplication
-- vector invertion if q is prime
 - matrix multiplication (not optimised)
-- get matrix trace
-- get matrix determinant
+- Montgomery form
+
+### Multiplications in Z/3329Z 
+- I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
