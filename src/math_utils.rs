@@ -1,3 +1,5 @@
+use rand::prelude::*;
+
 #[derive(Copy)]
 #[derive(Clone)]
 #[derive(Debug)]
@@ -47,7 +49,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
 
 
 
-    fn scalar_mult(&mut self,n : i32){
+    pub fn scalar_mult(&mut self,n : i32){
 
         for i in 0..VECTOR_SIZE {
             let tmp = MontgomeryForm::new(n);
@@ -246,17 +248,17 @@ impl MontgomeryForm{
         let s : i32  = i32::try_from((i64::from(self.a) * i64::from(self.k)) %  i64::from(self.r)).unwrap();
 
 
-        let t : i32= dbg!(self.a + s*self.q);
+        let t : i32= self.a + s*self.q;
 
 
         let u : i32 = t >> self.r_pow; // u = t/r
 
-        println!("{0} = {1} ?",(u % self.q), i32::try_from((i64::from(self.a)*i64::from(self.r_1)) % i64::from(self.q)).unwrap() );
+        //println!("{0} = {1} ?",(u % self.q), i32::try_from((i64::from(self.a)*i64::from(self.r_1)) % i64::from(self.q)).unwrap() );
 
         
         if(u < self.q){
             self.n = u;
-            return dbg!(u);
+            return u;
         }else{
             self.n = u-self.q;
             return self.n;
@@ -273,68 +275,148 @@ impl MontgomeryForm{
 }
 
 
+pub fn square_and_mult(x : u32, e : u32, m : u32) -> u32{
+    if e == 0 {
+        return 1;
+    }else if e == 1 {
+        return x;
+    }
+    let mut ret : u32 = 1;
+    let mut iter : u32= x ;
+    let mut exp = e;
+    // we decompose the exponent in binary
+    // so we can multiply x by the iterator everytime have to
+    // and thus, multiply by x^k, k being a power of 2
+    // this boils down to summing powers of 2 until we recreate the exponent we wanted
+    while exp > 1 {
 
-
-
-
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-    #[test]
-    fn test_vector_add_with_modulo() {
-        // (2000 + 1500) % 3329 = 3500 % 3329 = 171
-        // (3328 + 1) % 3329 = 0
-        let mut v1 = Vector::new(&[2000, 3328], 3329);
-        let v2 = Vector::new(&[1500, 1], 3329);
-        v1.add(v2);
-        
-        assert_eq!(v1.c, [171, 0], "L'addition modulaire a échoué");
+        iter = iter *iter % m;
+        exp = exp >> 1;
+        // current_pow = current_pow + k
+        if exp % 2 == 1 {
+            ret = ret * iter % m;
+        }
+    }
+    // final pow+1 if power was odd 
+    if e % 2 == 1 {
+        ret = ret*x % m;
     }
 
-    #[test]
-    fn test_vector_dot_product_with_modulo() {
-        // (1000 * 4 % 3329) + (2 * 500 % 3329)
-        // (4000 % 3329) + (1000 % 3329) = 671 + 1000 = 1671
-        let mut v1 = Vector::new(&[1000, 2], 3329);
-        let v2 = Vector::new(&[4, 500], 3329);
-        let result = v1.dot(v2);
-        
-        assert_eq!(result, 1671, "Le produit scalaire est faux !");
-    }
-
-    #[test]
-    fn test_vector_scalar_mult_modulo() {
-        // (2000 * 2) % 3329 = 4000 % 3329 = 671
-        // (3000 * 2) % 3329 = 6000 % 3329 = 2671
-        let mut v = Vector::new(&[2000, 3000], 3329);
-        v.scalar_mult(2);
-
-        assert_eq!(v.c, [671, 2671], "La multiplication par un scalaire n'applique pas encore le modulo");
-    }
-
-    #[test]
-    fn test_matrix_matmul_modulo() {
-        // Matrice 2x2 avec modulo 3329
-        // Row 0, Col 0: (2000*2 + 1000*1) % 3329 = 5000 % 3329 = 1671
-        // Row 0, Col 1: (2000*1 + 1000*2) % 3329 = 4000 % 3329 = 671
-        let mut m1 = Matrix::new([[2000, 1000], [0, 1]], 3329);
-        let m2 = Matrix::new([[2, 1], [1, 2]], 3329); 
-        let res = m1.matmul(m2);
-        
-        assert_eq!(res.row_vecs[0].c[0], 1671, "Matmul R0C0 incorrect");
-        assert_eq!(res.row_vecs[0].c[1], 671,  "Matmul R0C1 incorrect");
-        assert_eq!(res.row_vecs[1].c[0], 1,    "Matmul R1C0 incorrect");
-        assert_eq!(res.row_vecs[1].c[1], 2,    "Matmul R1C1 incorrect");
-    }
-
-
-    #[test]
-
-    fn test_montgomery_form(){
-        let a = MontgomeryForm::new(3948);
-
-        assert_eq!(a.mult(124).to_standard(),189);
-
-    }
+    return ret;
 }
+
+
+
+pub fn mod_inv(zeta : i32,n : i32) -> i32{
+    let mut r : i32 = 0;
+    let mut r_1 : i32 = 0;
+    let mut u : i32 = 0;
+    let mut v : i32 = 1;
+    let mut u_1 : i32 = 1;
+    let mut v_1 : i32 = 0;
+    let mut b = n;
+    let mut a = zeta;
+
+    // first round
+
+    // au + bv = pgcd(a,b) = 1
+    // b = n ; a = zeta; u = zeta⁻¹
+    let mut tmp = 0;
+    while (r != 1) {
+        
+        r_1 = r;
+        r = a % b;
+
+        tmp = u;
+        u = u_1 - (r_1/r)*u;
+        u_1 = tmp;
+
+        tmp = v;
+        v = v_1 - (r_1/r)*v;
+        v_1 = tmp;
+        
+        a = b;
+        b = r;
+        
+    }
+    println!("u={u}, v={v}");
+    return v;
+}
+
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+#[test]
+fn test_vector_add_with_modulo() {
+    // (2000 + 1500) % 3329 = 3500 % 3329 = 171
+    // (3328 + 1) % 3329 = 0
+    let mut v1 = Vector::new(&[2000, 3328], 3329);
+    let v2 = Vector::new(&[1500, 1], 3329);
+    v1.add(v2);
+    
+    assert_eq!(v1.c, [171, 0], "L'addition modulaire a échoué");
+}
+
+#[test]
+fn test_vector_dot_product_with_modulo() {
+    // (1000 * 4 % 3329) + (2 * 500 % 3329)
+    // (4000 % 3329) + (1000 % 3329) = 671 + 1000 = 1671
+    let mut v1 = Vector::new(&[1000, 2], 3329);
+    let v2 = Vector::new(&[4, 500], 3329);
+    let result = v1.dot(v2);
+    
+    assert_eq!(result, 1671, "Le produit scalaire est faux !");
+}
+
+#[test]
+fn test_vector_scalar_mult_modulo() {
+    // (2000 * 2) % 3329 = 4000 % 3329 = 671
+    // (3000 * 2) % 3329 = 6000 % 3329 = 2671
+    let mut v = Vector::new(&[2000, 3000], 3329);
+    v.scalar_mult(2);
+
+    assert_eq!(v.c, [671, 2671], "La multiplication par un scalaire n'applique pas encore le modulo");
+}
+
+#[test]
+fn test_matrix_matmul_modulo() {
+    // Matrice 2x2 avec modulo 3329
+    // Row 0, Col 0: (2000*2 + 1000*1) % 3329 = 5000 % 3329 = 1671
+    // Row 0, Col 1: (2000*1 + 1000*2) % 3329 = 4000 % 3329 = 671
+    let mut m1 = Matrix::new([[2000, 1000], [0, 1]], 3329);
+    let m2 = Matrix::new([[2, 1], [1, 2]], 3329); 
+    let res = m1.matmul(m2);
+    
+    assert_eq!(res.row_vecs[0].c[0], 1671, "Matmul R0C0 incorrect");
+    assert_eq!(res.row_vecs[0].c[1], 671,  "Matmul R0C1 incorrect");
+    assert_eq!(res.row_vecs[1].c[0], 1,    "Matmul R1C0 incorrect");
+    assert_eq!(res.row_vecs[1].c[1], 2,    "Matmul R1C1 incorrect");
+}
+
+
+#[test]
+
+fn test_montgomery_form(){
+
+    let mut rng: ThreadRng = rand::rng();
+    for _ in 0..1000{
+
+        let a : i32 = (rng.next_u32() % 1<<14).try_into().unwrap();
+        let m : i32 = (rng.next_u32() %1<<14).try_into().unwrap();
+
+        let mtg = MontgomeryForm::new(a);
+        let res = mtg.mult(m).to_standard();
+        let true_res = (a*m)%3329;
+        assert_eq!(res,true_res, "reduction failed : {res} != {true_res}");
+    }
+
+
+
+}
+}
+

@@ -1,8 +1,6 @@
 pub mod math_utils;
 pub mod ntt;
 fn main() {
-    let v = math_utils::Vector::new(&[0;5],10);
-
-    println!("{:?}",v);
-
+    ntt::compute_zeta_table();
+    ntt::compute_inv_zeta_table();
 }
