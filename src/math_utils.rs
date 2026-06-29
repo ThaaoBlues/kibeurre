@@ -1,4 +1,18 @@
-use rand::prelude::*;
+
+use std::ops::Add;
+
+use crate::ntt;
+
+
+
+
+const POLYNOMIAL_SIZE : usize = 256;
+
+
+
+
+
+
 
 #[derive(Copy)]
 #[derive(Clone)]
@@ -18,8 +32,15 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         return self.c.len();
     }
 
+    pub fn set(&mut self,index : usize,v : i32){
+        self.c[index] = v;
+    }
+    pub fn get(&self, index : usize)->i32{
+        return self.c[index];
+    }
 
-    fn add(&mut self, v2 : Vector<VECTOR_SIZE>){
+
+    pub fn add(&mut self, v2 : Vector<VECTOR_SIZE>){
         
 
         //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
@@ -34,7 +55,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
 
 
 
-    fn dot(&mut self, v2 : Vector<VECTOR_SIZE>) -> i32{
+    pub fn dot(&mut self, v2 : Vector<VECTOR_SIZE>) -> i32{
         let mut ret : i32 = 0;
 
 
@@ -95,10 +116,258 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         return v;
     }
 
+
+    pub fn to_string(&self)->String{
+        let mut ret : String = String::new();
+
+        for i in 0..VECTOR_SIZE {
+           ret.push_str(&format!("{}",self.c[i]));
+        }
+
+        return ret;
+    }
+
+    pub fn get_bytes(&self)->Vec<u8>{
+        let mut ret : Vec<u8> = Vec::new();
+
+        for i in 0..VECTOR_SIZE {
+           ret.extend_from_slice(&self.c[i].to_le_bytes());
+        }
+
+        return ret;
+    }
+
+}
+
+
+/*
+
+Vectors of size 256 polynomials
+*/
+
+
+#[derive(Copy)]
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct PolyVector<const VECTOR_SIZE : usize> {
+    pub c : [Vector<POLYNOMIAL_SIZE>;VECTOR_SIZE],
+    m : i32
+}
+
+impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
+
+    pub fn new( val : &[Vector<POLYNOMIAL_SIZE>;VECTOR_SIZE],m : i32 ) -> PolyVector<VECTOR_SIZE>{
+        PolyVector { c : *val, m : m}
+    }
+
+    fn size(&self)->usize{
+        return self.c.len();
+    }
+
+    pub fn set(&mut self,index : usize,v : Vector<POLYNOMIAL_SIZE>){
+        self.c[index] = v;
+    }
+    pub fn get(&self, index : usize)->Vector<POLYNOMIAL_SIZE>{
+        return self.c[index];
+    }
+
+
+    pub fn add(&mut self, v2 : PolyVector<VECTOR_SIZE>){
+        
+
+        //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
+
+        for i in 0..VECTOR_SIZE {
+            self.c[i].add(v2.c[i]);
+        }
+
+        //Vector::new( &tmp);
+
+    }
+
+
+    pub fn ntt_dot(&mut self, v2 : PolyVector<VECTOR_SIZE>) -> Vector<POLYNOMIAL_SIZE>{
+        /* assume both vectors are in NTT form, and compute the dot product in NTT form
+         assume the first vector is line and the second one is column
+         so the result is a single polynomial
+
+        */
+
+        let mut ret : Vector<POLYNOMIAL_SIZE> = Vector::new(&[0;POLYNOMIAL_SIZE],self.m);
+
+        for i in 0..VECTOR_SIZE {
+            let tmp : Vector<POLYNOMIAL_SIZE> = ntt::poly_mult(self.c[i],v2.c[i]);
+            for j in 0..POLYNOMIAL_SIZE {
+                ret.c[j].add(tmp.c[j]);
+            }
+            
+        }
+
+        return ret;
+    
+    }
+
+
+
+    pub fn scalar_mult(&mut self,n : i32){
+        // apply multiplication on each polynomial by n
+
+        for i in 0..VECTOR_SIZE {
+           self.c[i].scalar_mult(n);
+        } 
+
+    }
+
+
+
+    pub fn to_string(&self)->String{
+        let mut ret : String = String::new();
+
+        for i in 0..VECTOR_SIZE {
+           ret.push_str(&format!("{:?}",self.c[i]));
+        }
+
+        return ret;
+    }
+
+
+}
+
+
+/*
+Matrices of polynomials
+
+*/
+
+#[derive(Copy)]
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct PolyMatrix<const RN : usize, const CN : usize>{
+    row_vecs : [PolyVector<CN>;RN],
+    col_vecs : [PolyVector<RN>;CN],
+    m : i32
+}
+
+
+impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
+
+    pub fn new(val : [PolyVector<CN>;RN], m : i32)->PolyMatrix<RN, CN>{
+
+
+        // the array of arrays we get as parameter
+        // is a rows representation of the matrix
+
+
+        // build two representations to ease matrix multiplications
+        // one where we store matrix by its rows
+        // and the second by its columns
+
+        // rows
+        let mut r_v : [PolyVector<CN>;RN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],m);CN],m);RN];
+
+        // columns
+        let mut c_v : [PolyVector<RN>;CN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],m);RN],m);CN];
+
+        for i in 0..CN{
+            r_v[i] = val[i];
+        
+        }
+
+
+
+        for i in 0..CN{
+            for j in 0..RN {
+                c_v[i].c[j] = val[j].c[i];
+            }
+        }
+        
+        PolyMatrix { col_vecs : c_v, row_vecs : r_v, m : m}
+
+    }
+
+
+
+    pub fn ntt_mult_vec(&mut self, v : PolyVector<CN>)->PolyVector<RN>{
+        /*
+        Assume matrix and vector are in NTT form, and compute the product in NTT form
+        
+        */
+
+        // A = Av
+        let mut ret : PolyVector<RN> = PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);
+        for i in 0..RN{
+
+            // TODO : voir la multiplication de 2 PolyVector
+            // savoir si ça renvoie un polyvector ou un vector
+
+            ret.c[i] = self.row_vecs[i].ntt_dot(v);
+        }
+
+        return ret;
+    }
+
+
+    pub fn matmul(&mut self, B : PolyMatrix<CN,RN>)->PolyMatrix<CN,RN>{
+        
+        let mut ret : PolyMatrix<CN,RN> = PolyMatrix::new([PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);CN],self.m);
+
+        for i in 0..RN{
+            
+            for j in 0..CN {
+                ret.row_vecs[i].c[j] = self.row_vecs[i].ntt_dot(B.col_vecs[j]);
+                ret.col_vecs[j].c[i] = ret.row_vecs[i].c[j];
+            }
+        }
+
+
+        ret
+
+
+    }
+
+    fn transpose(& self) -> PolyMatrix<CN,RN>{
+        let mut ret : PolyMatrix<CN,RN> = PolyMatrix::new([PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);CN],self.m);
+        ret.col_vecs = self.row_vecs;
+        ret.row_vecs = self.col_vecs;
+
+        ret
+    }
+
+    pub fn set_row(&mut self, row_index : usize, v : PolyVector<CN>){
+        self.row_vecs[row_index] = v;
+
+        // update the columns based representation
+        for col_index in 0..RN {
+            self.col_vecs[col_index].set(row_index,self.row_vecs[row_index].get(col_index));
+        }
+        
+        
+    }
+
+    pub fn get_row(&self, row_index : usize) -> PolyVector<CN>{
+        return self.row_vecs[row_index];
+    }
+
+    pub fn set_col(&mut self, col_index : usize, v : PolyVector<RN>){
+        self.col_vecs[col_index] = v;
+
+        // update the columns based representation
+        for row_index in 0..RN {
+            self.row_vecs[col_index].set(row_index,self.col_vecs[col_index].get(row_index));
+        }    
+    }
+
+    pub fn set_coef(&mut self, col_index : usize, row_index : usize, v : Vector<POLYNOMIAL_SIZE>){
+        self.row_vecs[row_index].set(col_index,v);
+
+        self.col_vecs[col_index].set(row_index,v);
+    }
+
 }
 
 
 
+// matrix of integers
 #[derive(Copy)]
 #[derive(Clone)]
 #[derive(Debug)]
@@ -108,10 +377,9 @@ pub struct Matrix<const RN : usize, const CN : usize>{
     m : i32
 }
 
-
 impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
 
-    fn new(val : [[i32;CN];RN], m : i32)->Matrix<RN, CN>{
+    pub fn new(val : [[i32;CN];RN], m : i32)->Matrix<RN, CN>{
 
 
         // the array of arrays we get as parameter
@@ -144,7 +412,21 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
 
     }
 
-    fn matmul(&mut self, B : Matrix<CN,RN>)->Matrix<CN,RN>{
+
+    pub fn mult_vec(&mut self, v : Vector<CN>)->Vector<RN>{
+        // A = Av
+
+        let mut ret : Vector<RN> = Vector::new(&[0;RN],self.m);
+
+        for i in 0..RN{
+            ret.c[i] = self.row_vecs[i].dot(v);
+        }
+
+        return ret;
+    }
+
+
+    pub fn matmul(&mut self, B : Matrix<CN,RN>)->Matrix<CN,RN>{
         
         let mut ret : Matrix<CN,RN> = Matrix::new([[0;RN];CN],self.m);
 
@@ -168,6 +450,36 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
         ret.row_vecs = self.col_vecs;
 
         ret
+    }
+
+    pub fn set_row(&mut self, row_index : usize, v : Vector<CN>){
+        self.row_vecs[row_index] = v;
+
+        // update the columns based representation
+        for col_index in 0..RN {
+            self.col_vecs[col_index].set(row_index,self.row_vecs[row_index].get(col_index));
+        }
+        
+        
+    }
+
+    pub fn get_row(&self, row_index : usize) -> Vector<CN>{
+        return self.row_vecs[row_index];
+    }
+
+    pub fn set_col(&mut self, col_index : usize, v : Vector<RN>){
+        self.col_vecs[col_index] = v;
+
+        // update the columns based representation
+        for row_index in 0..RN {
+            self.row_vecs[col_index].set(row_index,self.col_vecs[col_index].get(row_index));
+        }    
+    }
+
+    pub fn set_coef(&mut self, col_index : usize, row_index : usize, v : i32){
+        self.row_vecs[row_index].set(col_index,v);
+
+        self.col_vecs[col_index].set(row_index,v);
     }
 
 }

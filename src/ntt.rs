@@ -23,7 +23,7 @@ use crate::math_utils::square_and_mult;
 
 // Kyber style NTT, stops at degree 1 to use nth unity root
 // returns 128 polynomials => vector still size 256 
-fn ntt(p : Vector<256>) -> Vector<256>{
+pub fn ntt(p : Vector<256>) -> Vector<256>{
     
         
 
@@ -108,7 +108,7 @@ fn ntt(p : Vector<256>) -> Vector<256>{
 
 
 // see end of page 14
-fn intt(p : Vector<256>)->Vector<256>{
+pub fn intt(p : Vector<256>)->Vector<256>{
 
     
 
@@ -189,7 +189,7 @@ fn intt(p : Vector<256>)->Vector<256>{
 /*
 Uses NTT to quickly compute the product of two degree 256 polynomials 
 */
-fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
+pub fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
 
 
     

@@ -11,7 +11,8 @@ Contains all basic vector and matrices operations in Z/qZ :
 - vector scalar multiplication
 - matrix multiplication (not optimised)
 - Montgomery form
-- 
+- Fast exponentiation algorithm
+
 
 
 # Kyber core principles
@@ -25,8 +26,7 @@ Contains all basic vector and matrices operations in Z/qZ :
 # NTT
 
 I first learned NTT throught theses ressources : 
-- [Satriawan, Ardianto, et al. « A Complete Beginner Guide to the Number Theoretic Transform (NTT) ». nᵒ 2024/585, 2024, Cryptology ePrint Archive. Cryptology ePrint Archive (eprint.iacr.org), https://eprint.iacr.org/2024/585.
-](2024-585.pdf)
+- [Satriawan, Ardianto, et al. « A Complete Beginne Guide to the Number Theoretic Transform (NTT) ». nᵒ 2024/585, 2024, Cryptology ePrint Archive. Cryptology ePrint Archive (eprint.iacr.org), https://eprint.iacr.org/2024/585.](2024-585.pdf)
 
 - [Cryptograhy 101 Kyber Course](https://youtu.be/ey1ND_xPITw)
 
@@ -40,3 +40,15 @@ I prefered to let them be in the standard one and compute the Montgomery form on
 
 ### Multiplications in Z/3329Z 
 - I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
+
+
+
+
+## TOUDOU : 
+- matrix of polynomials
+- vectors of polynomials
+- adapter les algos pour utiliser les versions Poly{Matrix,Vector}
+    * génération de A
+    * génération de vecteurs de bruit
+- finir le main de chiffrement/déchiffrement
+- faire les tests sur les vecteurs de tests officiels
