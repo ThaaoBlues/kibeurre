@@ -1,14 +1,12 @@
 use std::ops::Shl;
 
-use crate::math_utils::{PolyMatrix,PolyVector,Vector,Matrix,empty_polymatrix,empty_polyvector,empty_vector};
+use crate::math_utils::{PolyMatrix,PolyVector,Vector,empty_polymatrix,empty_polyvector,empty_vector};
 
 use crate::ntt;
 use rand;
-use shake;
-use shake::ExtendableOutput;
-use shake::Update;
-use shake::XofReader;
+use shake::{ExtendableOutput, Update, XofReader};
 use crate::parameters::{n, k, q,eta_1, eta_2, d_u, d_v,m};
+use crate::format_utils::{string_to_vectors,vectors_to_string};
 
 
 
@@ -50,13 +48,14 @@ pub fn generate_seed_vector() -> Vector<n>{
     let mut r  :[i32; n] = [0; n];
     for i in 0..n{
         // random bits
-        r[i] = (rand::random::<i32>() % 2).abs();
+        r[i] = (rand::random::<u8>() % 2) as i32;
     }
 
     return Vector::new(&r,m);
 
 }
 
+#[allow(non_snake_case)]
 pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
 
     /*
@@ -67,7 +66,7 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
     // A is used for debugging and will be removed,
     // A_ntt is used for the actual encryption/decryption process
     
-    let mut A : PolyMatrix<k,k> = empty_polymatrix();
+    //let mut A : PolyMatrix<k,k> = empty_polymatrix();
     let mut A_ntt : PolyMatrix<k,k> = empty_polymatrix();
     let mut generated_polynomial : Vector<n> = empty_vector();
 
@@ -93,7 +92,7 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
                 
             }
             
-            A.set_coef(i,j,generated_polynomial);
+            //A.set_coef(i,j,generated_polynomial);
             A_ntt.set_coef(i, j, ntt::ntt(generated_polynomial));
         }
 
@@ -103,11 +102,6 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
 
     return A_ntt;
 
-}
-
-
-fn generate_small_vector(j : i32, eta : i32) -> Vector<n>{
-    return Vector::new(&[0; n],m);
 }
 
 
@@ -138,7 +132,7 @@ pub fn generate_noise_polyvector(eta : i16) -> PolyVector<k>{
 }
 
 
-
+#[allow(non_snake_case)]
 pub fn compute_t(mut A : PolyMatrix<k,k>, s : PolyVector<k>, e : PolyVector<k>) -> PolyVector<k>{
 
     // t = As+e
@@ -164,6 +158,8 @@ fn compress(mut u : Vector<n>, d : i32) -> Vector<n>{
     return u;
 
 }
+
+
 
 fn compress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
 
@@ -246,6 +242,7 @@ pub struct EncryptedMessage{
 /*
 returns [u,v]
 */
+#[allow(non_snake_case)]
 pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : Vector<n>) -> EncryptedMessage{
 
 
@@ -285,13 +282,95 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
 
 }
 
-pub fn decrypt(EncryptedMessage { u, v }: &mut EncryptedMessage, s : &mut PolyVector<k>) -> Vector<n>{
+pub fn decrypt(EncryptedMessage { u, v }: &mut EncryptedMessage, s : PolyVector<k>) -> Vector<n>{
 
     // m = round(v - s^T.u)
-    v.sub(s.ntt_dot(*u));
+
+    // do not modify s, as it could be used for multiple decryption operations
+    let s_copy = s.clone();
+    v.sub(s_copy.ntt_dot(*u));
     return round(*v);
 
 }
+
+
+
+/*
+Uses encrypt function to directly encrypt a string into a vector of EncryptedMessage,
+where each EncryptedMessage represents a chunk of 256 bits of the string.
+*/
+#[allow(non_snake_case)]
+pub fn encrypt_string(input: &str,PublicKey { A, t, seed : _ }: &PublicKey,r : PolyVector<k>) -> Vec<EncryptedMessage> {
+    let input_chunks = string_to_vectors(input);
+    let mut encrypted_chunks = Vec::new();
+
+    for chunk in input_chunks {
+        let encrypted_chunk = encrypt(*A, *t, r, chunk);
+        encrypted_chunks.push(encrypted_chunk);
+    }
+
+    return encrypted_chunks;
+}
+
+
+/*
+Uses decrypt function to directly decrypt a vector of EncryptedMessage into a string,
+where each EncryptedMessage represents a chunk of 256 bits of the string.
+*/
+pub fn decrypt_string(encrypted_chunks: &mut Vec<EncryptedMessage>, PrivateKey { s }: &PrivateKey) -> String {
+    let mut decrypted_chunks = Vec::new();
+
+    for encrypted_chunk in encrypted_chunks {
+        let decrypted_chunk = decrypt(encrypted_chunk, *s);
+        decrypted_chunks.push(decrypted_chunk);
+    }
+
+    return vectors_to_string(decrypted_chunks);
+}
+
+
+#[derive(Clone)]
+pub struct PublicKey{
+    #[allow(non_snake_case)]
+    A : PolyMatrix<k,k>,
+    t : PolyVector<k>,
+    seed : Vector<n>
+}
+
+impl PublicKey {
+
+    pub fn new(seed : Vector<n>,t : PolyVector<k>)->PublicKey{
+        return PublicKey { A: generate_A_from_seed(seed), t: t, seed }
+    }
+}
+
+#[derive(Clone)]
+pub struct PrivateKey{
+    s : PolyVector<k>
+}
+
+impl PrivateKey {
+
+    pub fn new(s : PolyVector<k>)->PrivateKey{
+        return PrivateKey { s }
+    }
+}
+
+
+pub fn generate_key_pair() -> (PublicKey, PrivateKey) {
+    let seed_vector = generate_seed_vector();
+    let A = generate_A_from_seed(seed_vector.clone());
+    let s = generate_noise_polyvector(eta_1);
+    let e = generate_noise_polyvector(eta_2);
+    let t = compute_t(A, s, e);
+
+    let public_key = PublicKey::new(seed_vector, t);
+    let private_key = PrivateKey::new(s);
+
+    return (public_key, private_key);
+}
+
+
 
 
 #[cfg(test)]
@@ -313,6 +392,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     fn test_generate_A_from_seed() {
         let seed_vector = generate_seed_vector();
         let A = generate_A_from_seed(seed_vector);
@@ -336,6 +416,7 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt() {
         let seed_vector = generate_seed_vector();
+        #[allow(non_snake_case)]
         let A = generate_A_from_seed(seed_vector);
         let s = generate_noise_polyvector(eta_1);
         let e = generate_noise_polyvector(eta_2);
@@ -344,7 +425,7 @@ mod tests {
         let msg = generate_seed_vector(); // using seed vector as a message for testing
         let mut encrypted_message = encrypt(A, t, r, msg.clone());
         println!("Encrypted message: u = {:?}, v = {:?}", encrypted_message.u, encrypted_message.v);
-        let decrypted_msg = decrypt(&mut encrypted_message, &mut s.clone());
+        let decrypted_msg = decrypt(&mut encrypted_message, s);
 
 
 

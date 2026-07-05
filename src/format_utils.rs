@@ -12,11 +12,11 @@ pub fn string_to_vectors(input: &str) -> Vec<Vector<n>> {
     let mut vectors = Vec::new();
 
 
-    for chunk in bytes.chunks(n) {
+    for chunk in bytes.chunks(n/8) {
         let mut vector = empty_vector(); // filled with zeros, will be used as padding
         for (i, &byte) in chunk.iter().enumerate() {
 
-            for j in 0..7 {
+            for j in 0..8 {
                 let bit = (byte >> j) & 1;
                 vector.set(i * 8 + j, bit as i32);
             }
@@ -32,11 +32,11 @@ pub fn vectors_to_string(vectors: Vec<Vector<n>>) -> String {
     let mut bytes = Vec::new();
     for vector in vectors {
 
-        for i in 0..32 {
+        for i in 0..(n/8) {
             let mut byte = 0;
         
             
-            for j in 0..7 {
+            for j in 0..8 {
                 
                 let bit = vector.get(i * 8 + j) as u8;
                 if bit != 0 {
@@ -56,3 +56,4 @@ pub fn vectors_to_string(vectors: Vec<Vector<n>>) -> String {
     }
     return String::from_utf8(bytes).unwrap_or_else(|_| String::from("Invalid UTF-8"));
 }
+

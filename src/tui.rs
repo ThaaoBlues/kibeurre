@@ -20,7 +20,7 @@ use std::io;
 use crate::parameters::{d_u, d_v, eta_1, eta_2, k, m, n, q};
 
 
-use crate::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t, EncryptedMessage};
+use crate::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t};
 use crate::format_utils::{string_to_vectors, vectors_to_string};
 
 
@@ -63,8 +63,9 @@ impl AppState {
         });
         
         let seed_vector = generate_seed_vector();
+        #[allow(non_snake_case)]
         let A = generate_A_from_seed(seed_vector);
-        let mut s = generate_noise_polyvector(eta_1);
+        let s = generate_noise_polyvector(eta_1);
         let e = generate_noise_polyvector(eta_2);
         let t = compute_t(A.clone(), s.clone(), e);
 
@@ -89,7 +90,7 @@ impl AppState {
         });
 
         let mut encrypted_chunks = Vec::new();
-        for (i, chunk) in msg.iter().enumerate() {
+        for (_, chunk) in msg.iter().enumerate() {
             let r = generate_noise_polyvector(eta_1);
             encrypted_chunks.push(encrypt(A, t, r, chunk.clone()));
         }
@@ -110,7 +111,7 @@ impl AppState {
         let mut decrypted_chunks = Vec::new();
 
         for encrypted in &mut encrypted_chunks {
-            let decrypted_msg = decrypt(encrypted, &mut s);
+            let decrypted_msg = decrypt(encrypted, s);
             decrypted_chunks.push(decrypted_msg);
         }
 
@@ -161,7 +162,7 @@ pub fn mainloop() -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut AppState) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui(f, app));
+        let _ = terminal.draw(|f| ui(f, app));
 
         if let Event::Key(key) = event::read()? {
             match key.code {
@@ -203,7 +204,7 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
             Constraint::Min(10),   // Workspace body
             Constraint::Length(3), // Bottom status bar
         ])
-        .split(f.size());
+        .split(f.area());
 
     // Title Widget
     let header = Paragraph::new("KIBEURREEEEEEEE TEST TUI")
@@ -234,6 +235,7 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
 
     // Render Steps Execution Stream
     let mut logs_text = String::new();
+    #[allow(unused_assignments)]
     if app.steps_log.is_empty() {
         logs_text = "\n Press [Enter] to run the message through your Kyber engine implementation pipeline.".to_string();
     } else {

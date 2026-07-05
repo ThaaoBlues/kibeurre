@@ -69,6 +69,13 @@ But it looks cool !
 - checks if decryption was successful
 
 
+# Ugly plot for a simple encryption/decryption benchmark
+
+![Ugly plot for a simple encryption/decryption benchmark](benchmark_results.png)
+
+> I did not have time yet to figure out why those obvious steps
+We can see that thoses steps happen every 32 bytes of input string data. My deduction is that the steps are somehow due to the addition of one more Vector<> of 256 bits (represented as i32 => not optimized) to encode/decode. It would explain the "stairs" shape as we only add one vectore evevery 256 bits of input data.
+
 
 ## TOUDOU
 - implement compression/decompression
