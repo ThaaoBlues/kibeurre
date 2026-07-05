@@ -2,6 +2,10 @@
 
 Kibeurre is a naive kyber implementation written in Rust. The goal of this projet is to make me work on lattices/LWE and Rust, ofc :)
 
+To try it, just `git clone https://github.com/thaaoblues/kibeurre.git` and `cd kibeurre`, finally `cargo run`.
+
+
+
 # Kyber core principles
 
 - [Cryptograhy 101 Kyber Course](https://www.youtube.com/watch?v=9NKm84vKALc&list=PLA1qgQLL41SSUOHlq8ADraKKzv47v2yrF)
