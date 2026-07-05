@@ -2,19 +2,6 @@
 
 Kibeurre is a naive kyber implementation written in Rust. The goal of this projet is to make me work on lattices/LWE and Rust ofc :)
 
-
-
-## math_utils.rs
-
-Contains all basic vector and matrices operations in Z/qZ :
-- vectors addition
-- vector scalar multiplication
-- matrix multiplication (not optimised)
-- Montgomery form
-- Fast exponentiation algorithm
-
-
-
 # Kyber core principles
 
 - [Cryptograhy 101 Kyber Course](https://www.youtube.com/watch?v=9NKm84vKALc&list=PLA1qgQLL41SSUOHlq8ADraKKzv47v2yrF)
@@ -22,8 +9,21 @@ Contains all basic vector and matrices operations in Z/qZ :
 - [Kyber repository](https://github.com/pq-crystals/kyber)
 
 
+## math_utils.rs
 
-# NTT
+Contains all basic vector and matrices operations in Z/qZ and Rq :
+- vectors addition
+- vector scalar multiplication
+- matrix multiplication (not optimised)
+- Montgomery form (for Z/qZ)
+
+
+## Multiplications in Z/3329Z 
+- I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
+
+
+
+# NTT (ntt.rs)
 
 I first learned NTT throught theses ressources : 
 - [Satriawan, Ardianto, et al. « A Complete Beginne Guide to the Number Theoretic Transform (NTT) ». nᵒ 2024/585, 2024, Cryptology ePrint Archive. Cryptology ePrint Archive (eprint.iacr.org), https://eprint.iacr.org/2024/585.](2024-585.pdf)
@@ -38,11 +38,9 @@ I prefered to let them be in the standard one and compute the Montgomery form on
 
 
 
-### Multiplications in Z/3329Z 
-- I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
 
 
-# Interactive TUI
+# Interactive TUI (tui.rs)
 The interactive TUI has been heavily vibecoded by Gemini.
 I sadly don't have time to learn ratatui and others fancy libraries.
 But it looks cool !

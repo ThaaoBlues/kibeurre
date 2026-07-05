@@ -121,11 +121,7 @@ impl AppState {
 
         let decrypted_msg = vectors_to_string(decrypted_chunks);
 
-        // Verification
-        self.steps_log.push(CryptoStep {
-            name: "[DEBUG] Verification".to_string(),
-            details: format!("Decrypted message: \"{}\" (length: {})\nOriginal message: \"{}\" (length: {})", decrypted_msg, decrypted_msg.len(), self.input_buffer, self.input_buffer.len()),
-        });
+
         self.success = Some(decrypted_msg == self.input_buffer);
         self.decrypted_result = decrypted_msg.clone();
 
