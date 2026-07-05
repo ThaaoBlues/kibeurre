@@ -18,7 +18,11 @@ use std::io;
 
 // Pulling in your modules and constants
 use crate::parameters::{d_u, d_v, eta_1, eta_2, k, m, n, q};
+
+
 use crate::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t, EncryptedMessage};
+use crate::format_utils::{string_to_vectors, vectors_to_string};
+
 
 /// Tracks the lifecycle events of the encryption run
 struct CryptoStep {
@@ -31,6 +35,7 @@ struct AppState {
     steps_log: Vec<CryptoStep>,
     decrypted_result: String,
     success: Option<bool>,
+    logs_scroll: u16,
 }
 
 impl AppState {
@@ -40,6 +45,7 @@ impl AppState {
             steps_log: Vec::new(),
             decrypted_result: String::new(),
             success: None,
+            logs_scroll: 0,
         }
     }
 
@@ -48,6 +54,7 @@ impl AppState {
             return;
         }
         self.steps_log.clear();
+        self.logs_scroll = 0;
 
         // 1. Setup Phase
         self.steps_log.push(CryptoStep {
@@ -61,9 +68,14 @@ impl AppState {
         let e = generate_noise_polyvector(eta_2);
         let t = compute_t(A.clone(), s.clone(), e);
 
-        // 2. Mocking character/string bits translation into Vector<n> for your message
-        // For simplicity of your API matching Vector<n>, we use your seed routine or map string bits
-        let msg = generate_seed_vector(); 
+        
+        let msg = string_to_vectors(&self.input_buffer);
+
+        self.steps_log.push(CryptoStep {
+            name: "[1.1] Message Polynomial Mapping".to_string(),
+            details: format!("Input string as vectors of size {n} generated: {:?}", msg),
+        });
+
         
         self.steps_log.push(CryptoStep {
             name: "[2] Message Polynomial Mapping".to_string(),
@@ -75,24 +87,53 @@ impl AppState {
             name: "[3] Encryption (Capsule)".to_string(),
             details: format!("Generated error vectors (η1={eta_1}, η2={eta_2}).\nComputed Vector pair (u, v)."),
         });
-        let r = generate_noise_polyvector(eta_1);
-        let mut encrypted = encrypt(A, t, r, msg.clone());
+
+        let mut encrypted_chunks = Vec::new();
+        for (i, chunk) in msg.iter().enumerate() {
+            let r = generate_noise_polyvector(eta_1);
+            encrypted_chunks.push(encrypt(A, t, r, chunk.clone()));
+        }
+
+        /*self.steps_log.push(CryptoStep {
+            name: "[3.1] Encryption Output".to_string(),
+            details: format!("Encrypted message chunks generated: {:?}", encrypted_chunks),
+        });*/
+
 
         // 4. Decryption
         self.steps_log.push(CryptoStep {
             name: "[4] Decryption".to_string(),
             details: "Running error correction round operation: m' = round(v - s^T * u)".to_string(),
         });
-        let decrypted_msg = decrypt(&mut encrypted, &mut s);
+
+
+        let mut decrypted_chunks = Vec::new();
+
+        for encrypted in &mut encrypted_chunks {
+            let decrypted_msg = decrypt(encrypted, &mut s);
+            decrypted_chunks.push(decrypted_msg);
+        }
+
+        self.steps_log.push(CryptoStep {
+            name: "[4.1] Decryption Output".to_string(),
+            details: format!("Decrypted message chunks generated: {:?}", decrypted_chunks),
+        });
+
+        let decrypted_msg = vectors_to_string(decrypted_chunks);
 
         // Verification
-        let is_match = msg.c == decrypted_msg.c;
-        self.success = Some(is_match);
-        self.decrypted_result = if is_match {
-            format!("SUCCESS: Output exactly matches message structure! Polynomial matches.")
-        } else {
-            "FAILURE: Decryption error detected.".to_string()
-        };
+        self.steps_log.push(CryptoStep {
+            name: "[DEBUG] Verification".to_string(),
+            details: format!("Decrypted message: \"{}\" (length: {})\nOriginal message: \"{}\" (length: {})", decrypted_msg, decrypted_msg.len(), self.input_buffer, self.input_buffer.len()),
+        });
+        self.success = Some(decrypted_msg == self.input_buffer);
+        self.decrypted_result = decrypted_msg.clone();
+
+        self.steps_log.push(CryptoStep {
+            name: "[5] Verification".to_string(),
+            details: format!("Decrypted message: \"{}\"\nOriginal message: \"{}\"\nMatch: {}", decrypted_msg, self.input_buffer, self.success.unwrap()),
+        });
+
     }
 }
 
@@ -137,6 +178,19 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut AppState) -> io::Re
                 }
                 KeyCode::Backspace => {
                     app.input_buffer.pop();
+                }
+
+                // Log scrolling controls
+                KeyCode::Up => {
+                    if app.logs_scroll > 0 {
+                        app.logs_scroll -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    // Prevent infinite scrolling downwards
+                    if !app.steps_log.is_empty() && app.logs_scroll < 100 { 
+                        app.logs_scroll += 1;
+                    }
                 }
                 _ => {}
             }
@@ -191,10 +245,7 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
             logs_text.push_str(&format!("● {}\n  {}\n\n", step.name, step.details));
         }
     }
-    let logs_widget = Paragraph::new(logs_text)
-        .block(Block::default().borders(Borders::ALL).title(" Execution Steps & Matrix Operations "))
-        .wrap(Wrap { trim: true });
-    f.render_widget(logs_widget, left_chunks[1]);
+
 
     // Output Result Window
     let status_color = match app.success {
@@ -217,7 +268,7 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
          • d_u (Bits): {}\n \
          • d_v (Bits): {}\n \
          • Ring Mod (m): {}\n\n \
-         🔒 PQC Post-Quantum\n    Lattice Secure Engine",
+         ",
         n, k, q, eta_1, eta_2, d_u, d_v, m
     );
     let params_widget = Paragraph::new(param_text)
@@ -229,4 +280,26 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
     let help_widget = Paragraph::new(" Type message text | [Enter] Simulate Cryptosystem Run | [Esc] Exit Interactive Mode")
         .style(Style::default().fg(Color::DarkGray));
     f.render_widget(help_widget, chunks[2]);
+
+
+    // Render Steps Execution Stream
+    let mut logs_text = String::new();
+    if app.steps_log.is_empty() {
+        logs_text = "\n Press [Enter] to run the message through your Kyber engine implementation pipeline.".to_string();
+    } else {
+        for step in &app.steps_log {
+            logs_text.push_str(&format!("● {}\n  {}\n\n", step.name, step.details));
+        }
+    }
+    
+    // Add scroll tuple parameter: (row_scroll, col_scroll)
+    let logs_widget = Paragraph::new(logs_text)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Execution Steps & Matrix Operations [Scroll: {}] ", app.logs_scroll))
+        )
+        .wrap(Wrap { trim: true })
+        .scroll((app.logs_scroll, 0)); // <--- Apply the vertical scroll state modifier here
+        
+    f.render_widget(logs_widget, left_chunks[1]);
 }

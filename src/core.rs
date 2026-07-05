@@ -243,7 +243,7 @@ fn decode_pk(){}
 fn encode_pk(){}
 
 
-
+#[derive(Debug)]
 pub struct EncryptedMessage{
     u : PolyVector<k>,
     v : Vector<n>
