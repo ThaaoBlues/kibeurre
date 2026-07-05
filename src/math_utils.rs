@@ -1,18 +1,26 @@
 
 use std::ops::Add;
-
+use crate::parameters::{n, k, q,eta_1, eta_2, d_u, d_v,m};
 use crate::ntt;
+use rand::Rng;
+use rand::rngs::ThreadRng;
 
 
 
 
-const POLYNOMIAL_SIZE : usize = 256;
+const POLYNOMIAL_SIZE : usize = n;
+pub const EMPTY_VECTOR : [i32;n] = [0;n];
+pub fn empty_vector() -> Vector<n>{
+    Vector::new(&EMPTY_VECTOR,m)
+}
 
+pub fn empty_polyvector() -> PolyVector<k>{
+    PolyVector::new(&[Vector::new(&EMPTY_VECTOR, m); k],m)
+}
 
-
-
-
-
+pub fn empty_polymatrix() -> PolyMatrix<k,k>{
+    PolyMatrix::new([PolyVector::new(&[Vector::new(&EMPTY_VECTOR, m); k],m); k],m)
+}
 
 #[derive(Copy)]
 #[derive(Clone)]
@@ -24,8 +32,8 @@ pub struct Vector<const VECTOR_SIZE : usize> {
 
 impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
 
-    pub fn new( val : &[i32;VECTOR_SIZE],m : i32 ) -> Vector<VECTOR_SIZE>{
-        Vector { c : *val, m : m}
+    pub fn new( val : &[i32;VECTOR_SIZE],_m : i32 ) -> Vector<VECTOR_SIZE>{
+        Vector { c : *val, m : _m}
     }
 
     fn size(&self)->usize{
@@ -54,6 +62,21 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
     }
 
 
+    pub fn sub(&mut self, v2 : Vector<VECTOR_SIZE>){
+        
+
+        //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
+
+        for i in 0..VECTOR_SIZE {
+            self.c[i] = (self.c[i] + v2.c[i]) % self.m;
+        }
+
+        //Vector::new( &tmp);
+
+    }
+
+
+
 
     pub fn dot(&mut self, v2 : Vector<VECTOR_SIZE>) -> i32{
         let mut ret : i32 = 0;
@@ -70,10 +93,10 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
 
 
 
-    pub fn scalar_mult(&mut self,n : i32){
+    pub fn scalar_mult(&mut self,v : i32){
 
         for i in 0..VECTOR_SIZE {
-            let tmp = MontgomeryForm::new(n);
+            let tmp = MontgomeryForm::new(v);
             self.c[i] = tmp.mult(self.c[i]).to_standard();
         } 
 
@@ -156,8 +179,8 @@ pub struct PolyVector<const VECTOR_SIZE : usize> {
 
 impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
-    pub fn new( val : &[Vector<POLYNOMIAL_SIZE>;VECTOR_SIZE],m : i32 ) -> PolyVector<VECTOR_SIZE>{
-        PolyVector { c : *val, m : m}
+    pub fn new( val : &[Vector<POLYNOMIAL_SIZE>;VECTOR_SIZE],_m : i32 ) -> PolyVector<VECTOR_SIZE>{
+        PolyVector { c : *val, m : _m}
     }
 
     fn size(&self)->usize{
@@ -186,14 +209,14 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
     }
 
 
-    pub fn ntt_dot(&mut self, v2 : PolyVector<VECTOR_SIZE>) -> Vector<POLYNOMIAL_SIZE>{
+    pub fn ntt_dot(&self, v2 : PolyVector<VECTOR_SIZE>) -> Vector<POLYNOMIAL_SIZE>{
         /* assume both vectors are in NTT form, and compute the dot product in NTT form
          assume the first vector is line and the second one is column
          so the result is a single polynomial
 
         */
 
-        let mut ret : Vector<POLYNOMIAL_SIZE> = Vector::new(&[0;POLYNOMIAL_SIZE],self.m);
+        let ret : Vector<POLYNOMIAL_SIZE> = Vector::new(&[0;POLYNOMIAL_SIZE],self.m);
 
         for i in 0..VECTOR_SIZE {
             let tmp : Vector<POLYNOMIAL_SIZE> = ntt::poly_mult(self.c[i],v2.c[i]);
@@ -209,11 +232,11 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
 
 
-    pub fn scalar_mult(&mut self,n : i32){
+    pub fn scalar_mult(&mut self,v : i32){
         // apply multiplication on each polynomial by n
 
         for i in 0..VECTOR_SIZE {
-           self.c[i].scalar_mult(n);
+           self.c[i].scalar_mult(v);
         } 
 
     }
@@ -251,7 +274,7 @@ pub struct PolyMatrix<const RN : usize, const CN : usize>{
 
 impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
 
-    pub fn new(val : [PolyVector<CN>;RN], m : i32)->PolyMatrix<RN, CN>{
+    pub fn new(val : [PolyVector<CN>;RN], _m : i32)->PolyMatrix<RN, CN>{
 
 
         // the array of arrays we get as parameter
@@ -263,10 +286,10 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
         // and the second by its columns
 
         // rows
-        let mut r_v : [PolyVector<CN>;RN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],m);CN],m);RN];
+        let mut r_v : [PolyVector<CN>;RN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],_m);CN],_m);RN];
 
         // columns
-        let mut c_v : [PolyVector<RN>;CN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],m);RN],m);CN];
+        let mut c_v : [PolyVector<RN>;CN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],_m);RN],_m);CN];
 
         for i in 0..CN{
             r_v[i] = val[i];
@@ -281,7 +304,7 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
             }
         }
         
-        PolyMatrix { col_vecs : c_v, row_vecs : r_v, m : m}
+        PolyMatrix { col_vecs : c_v, row_vecs : r_v, m : _m}
 
     }
 
@@ -297,9 +320,10 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
         let mut ret : PolyVector<RN> = PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);
         for i in 0..RN{
 
-            // TODO : voir la multiplication de 2 PolyVector
-            // savoir si ça renvoie un polyvector ou un vector
-
+            
+            // NTT PolyVector multiplication returns a Vector
+            // as we sum every result, like in classic vector multiplication
+            // (it is in fact, a classic vector)
             ret.c[i] = self.row_vecs[i].ntt_dot(v);
         }
 
@@ -325,7 +349,7 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
 
     }
 
-    fn transpose(& self) -> PolyMatrix<CN,RN>{
+    pub fn transpose(& self) -> PolyMatrix<CN,RN>{
         let mut ret : PolyMatrix<CN,RN> = PolyMatrix::new([PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);CN],self.m);
         ret.col_vecs = self.row_vecs;
         ret.row_vecs = self.col_vecs;
@@ -379,7 +403,7 @@ pub struct Matrix<const RN : usize, const CN : usize>{
 
 impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
 
-    pub fn new(val : [[i32;CN];RN], m : i32)->Matrix<RN, CN>{
+    pub fn new(val : [[i32;CN];RN], _m : i32)->Matrix<RN, CN>{
 
 
         // the array of arrays we get as parameter
@@ -391,13 +415,13 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
         // and the second by its columns
 
         // rows
-        let mut r_v : [Vector<CN>;RN] = [Vector::new(&[0;CN],m);RN];
+        let mut r_v : [Vector<CN>;RN] = [Vector::new(&[0;CN],_m);RN];
 
         // columns
-        let mut c_v : [Vector<RN>;CN] = [Vector::new(&[0;RN],m);CN];
+        let mut c_v : [Vector<RN>;CN] = [Vector::new(&[0;RN],_m);CN];
 
         for i in 0..CN{ 
-            r_v[i] = Vector::new(&val[i],m);
+            r_v[i] = Vector::new(&val[i],_m);
         }
 
 
@@ -408,7 +432,7 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
             }
         }
         
-        Matrix { col_vecs : c_v, row_vecs : r_v, m : m}
+        Matrix { col_vecs : c_v, row_vecs : r_v, m : _m}
 
     }
 
@@ -512,10 +536,10 @@ impl MontgomeryForm{
     // we assume q is prime as it will be in this usage ( q = 3329)
     // thus, we can hardcode values of r, r⁻¹ and k that will always work
     // n < q so i16 is more than sufficient here
-    pub fn new(n: i32) -> MontgomeryForm{
+    pub fn new(v: i32) -> MontgomeryForm{
 
         
-        MontgomeryForm { a: (n<<12) % 3329, n, q :3329, r_pow:12, r : 4096,r_1 : 2704, k: 3327 }
+        MontgomeryForm { a: (v<<12) % 3329, n:v, q :3329, r_pow:12, r : 4096,r_1 : 2704, k: 3327 }
 
     }
 
@@ -523,8 +547,8 @@ impl MontgomeryForm{
         self.a = a;
     }
 
-    pub fn set_n(&mut self, n : i32){
-        self.n = n;
+    pub fn set_n(&mut self, v : i32){
+        self.n = v;
     }
 
     pub fn get_a(&self)-> i32{
@@ -587,7 +611,7 @@ impl MontgomeryForm{
 }
 
 
-pub fn square_and_mult(x : u32, e : u32, m : u32) -> u32{
+pub fn square_and_mult(x : u32, e : u32, _m : u32) -> u32{
     if e == 0 {
         return 1;
     }else if e == 1 {
@@ -602,16 +626,16 @@ pub fn square_and_mult(x : u32, e : u32, m : u32) -> u32{
     // this boils down to summing powers of 2 until we recreate the exponent we wanted
     while exp > 1 {
 
-        iter = iter *iter % m;
+        iter = iter *iter % _m;
         exp = exp >> 1;
         // current_pow = current_pow + k
         if exp % 2 == 1 {
-            ret = ret * iter % m;
+            ret = ret * iter % _m;
         }
     }
     // final pow+1 if power was odd 
     if e % 2 == 1 {
-        ret = ret*x % m;
+        ret = ret*x % _m;
     }
 
     return ret;
@@ -619,14 +643,14 @@ pub fn square_and_mult(x : u32, e : u32, m : u32) -> u32{
 
 
 
-pub fn mod_inv(zeta : i32,n : i32) -> i32{
+pub fn mod_inv(zeta : i32,_n : i32) -> i32{
     let mut r : i32 = 0;
     let mut r_1 : i32 = 0;
     let mut u : i32 = 0;
     let mut v : i32 = 1;
     let mut u_1 : i32 = 1;
     let mut v_1 : i32 = 0;
-    let mut b = n;
+    let mut b = _n;
     let mut a = zeta;
 
     // first round
@@ -719,11 +743,11 @@ fn test_montgomery_form(){
     for _ in 0..1000{
 
         let a : i32 = (rng.next_u32() % 1<<14).try_into().unwrap();
-        let m : i32 = (rng.next_u32() %1<<14).try_into().unwrap();
+        let _m : i32 = (rng.next_u32() %1<<14).try_into().unwrap();
 
         let mtg = MontgomeryForm::new(a);
-        let res = mtg.mult(m).to_standard();
-        let true_res = (a*m)%3329;
+        let res = mtg.mult(_m).to_standard();
+        let true_res = (a*_m)%3329;
         assert_eq!(res,true_res, "reduction failed : {res} != {true_res}");
     }
 

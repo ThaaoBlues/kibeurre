@@ -203,17 +203,19 @@ pub fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
     // step by 2 as standardised kyber NTT returns degree 1 polynomials
     // instead of an array of constants
 
+    let mut zeta_index : usize = 0;
     for i in (0..256).step_by(2){
         let a0 = ntt_a.c[i];
         let a1 = ntt_a.c[i+1];
         let b0 = ntt_b.c[i];
         let b1 = ntt_b.c[i+1];
 
-        ntt_c.c[i] = a0*b0 + ZETA_TABLE[i] *a1*b1;
+        ntt_c.c[i] = a0.wrapping_mul(b0).wrapping_add(ZETA_TABLE[zeta_index as usize].wrapping_mul(a1.wrapping_mul(b1)));
 
         // x^2 % (x^2+1) = -1
         // -1 = zeta^n/2 
-        ntt_c.c[i+1] = a0*b1+a1*b0;
+        ntt_c.c[i+1] = a0.wrapping_mul(b1).wrapping_add(a1.wrapping_mul(b0));
+        zeta_index+=1;
     }
 
     return intt(ntt_c);

@@ -42,13 +42,11 @@ I prefered to let them be in the standard one and compute the Montgomery form on
 - I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
 
 
+# Interactive TUI
+The interactive TUI has been heavily vibecoded by Gemini.
+I sadly don't have time to learn ratatui and others fancy libraries.
+But it looks cool !
 
 
-## TOUDOU : 
-- matrix of polynomials
-- vectors of polynomials
-- adapter les algos pour utiliser les versions Poly{Matrix,Vector}
-    * génération de A
-    * génération de vecteurs de bruit
-- finir le main de chiffrement/déchiffrement
+## TOUDOU
 - faire les tests sur les vecteurs de tests officiels
