@@ -1,6 +1,12 @@
 import matplotlib.pyplot as plt
 from pandas import read_csv
 
+"""
+Credits to Gemini for the fancy dotted lines
+
+"""
+
+
 # Load your data
 encryption_data = read_csv("encryption_benchmark.csv", sep=",")
 decryption_data = read_csv("decryption_benchmark.csv", sep=",")
@@ -26,8 +32,8 @@ def mark_steps(data, label_prefix, color):
     time_diff = data["time_taken"].diff()
 
     # 2. Define a threshold for what constitutes a "step"
-    threshold = 1e-4
-    max_jump = 1e-3
+    threshold = 1.5e-4
+    max_jump = 2.25e-4
 
     # add maximum constraint to avoid taking cpu spikes into account
 
@@ -42,7 +48,7 @@ def mark_steps(data, label_prefix, color):
             linestyle="--",
             alpha=0.6,
         )
-        # Optional: Label the exact X-value on the plot
+
         plt.text(
             row["input_length"],
             row["time_taken"],
@@ -64,8 +70,8 @@ mark_steps(encryption_data, "Encryption", "blue")
 mark_steps(decryption_data, "Decryption", "orange")
 # ----------------------------
 
-plt.xlabel("Input Length")
-plt.ylabel("Time (seconds)")
+plt.xlabel("Input Length (Bytes)")
+plt.ylabel("Time (Seconds)")
 plt.title("Benchmark Results with Step Detection")
 plt.legend()
 plt.tight_layout()

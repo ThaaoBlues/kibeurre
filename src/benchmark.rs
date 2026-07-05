@@ -1,5 +1,5 @@
 use crate::core::{decrypt_string, encrypt_string, generate_key_pair, generate_noise_polyvector};
-use crate::parameters::{eta_1, eta_2};
+use crate::parameters::{eta_1};
 
 
 pub fn benchmark_encryption(max_input_len : i32) -> Vec<(i32, f64)> {

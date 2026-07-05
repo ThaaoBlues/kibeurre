@@ -78,6 +78,8 @@ But it looks cool !
 We can see that thoses steps happen every 32 bytes of input string data. My deduction is that the steps are somehow due to the addition of one more Vector<> of 256 bits (represented as i32 => not optimized) to encode/decode. It would explain the "stairs" shape as we only add one vectore evevery 256 bits of input data.
 
 
+_Disclaimer : As with the terminal user interface, the fancy dotter lines in the graph have been added with the help of Gemini_
+
 ## TOUDOU
 - implement compression/decompression
 - faire les tests sur les vecteurs de tests officiels
