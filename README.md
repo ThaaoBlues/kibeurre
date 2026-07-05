@@ -69,3 +69,5 @@ But it looks cool !
 ## TOUDOU
 - implement compression/decompression
 - faire les tests sur les vecteurs de tests officiels
+- fix all warnings
+- clean the code
