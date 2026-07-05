@@ -238,11 +238,6 @@ fn round_polyvector(v : PolyVector<k>) -> PolyVector<k>{
 }
 
 
-fn decode_pk(){}
-
-fn encode_pk(){}
-
-
 #[derive(Debug)]
 pub struct EncryptedMessage{
     u : PolyVector<k>,

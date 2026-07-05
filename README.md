@@ -1,6 +1,6 @@
 # KIBEURRE
 
-Kibeurre is a naive kyber implementation written in Rust. The goal of this projet is to make me work on lattices/LWE and Rust ofc :)
+Kibeurre is a naive kyber implementation written in Rust. The goal of this projet is to make me work on lattices/LWE and Rust, ofc :)
 
 # Kyber core principles
 
@@ -9,7 +9,7 @@ Kibeurre is a naive kyber implementation written in Rust. The goal of this proje
 - [Kyber repository](https://github.com/pq-crystals/kyber)
 
 
-## math_utils.rs
+# math_utils.rs
 
 Contains all basic vector and matrices operations in Z/qZ and Rq :
 - vectors addition
@@ -37,14 +37,35 @@ In the reference implementation pre-computed arrays of zeta powers and inverse p
 I prefered to let them be in the standard one and compute the Montgomery form on the fly, as i don't have another goal than self-learning and remembering easily is. Which speed optimisation can sometimes obstruct.
 
 
+# Kyber core (core.rs)
+- public key generation
+- private key generation
+- encryption/decryption
+- vectors rounding
+- Matrix generation from seed
+- noise sampling from central binomial distribution (error vectors)
+- "small" vectors sampling (absolute value of modulus < eta)
 
 
+# parameters (parameters.rs)
+I chose to implement ML-KEM-768.
+The constant in this file are choosen accordingly (I took them from the paper).
+
+# format_utils.rs
+Usefull functions to transform a string into a set of bit vectors and a set of bit vectors back to a string
 
 # Interactive TUI (tui.rs)
 The interactive TUI has been heavily vibecoded by Gemini.
-I sadly don't have time to learn ratatui and others fancy libraries.
+I sadly don't have time to learn ratatui and others fancy graphic libraries.
 But it looks cool !
+
+- string encryption
+- string decryption
+- log at each step
+- checks if decryption was successful
+
 
 
 ## TOUDOU
+- implement compression/decompression
 - faire les tests sur les vecteurs de tests officiels
