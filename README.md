@@ -81,7 +81,6 @@ We can see that thoses steps happen every 32 bytes of input string data. My dedu
 _Disclaimer : As with the terminal user interface, the fancy dotter lines in the graph have been added with the help of Gemini_
 
 ## TOUDOU
-- implement compression/decompression
 - faire les tests sur les vecteurs de tests officiels
 - fix all warnings
 - clean the code

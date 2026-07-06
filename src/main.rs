@@ -9,7 +9,7 @@ pub mod benchmark;
 
 
 fn main() {
-    let _ = tui::mainloop();
+    //let _ = tui::mainloop();
 
     
     // let mut result   = benchmark::benchmark_encryption(1000);
