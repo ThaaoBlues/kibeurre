@@ -151,7 +151,12 @@ fn compress(mut u : Vector<n>, d : i32) -> Vector<n>{
     
     // TODO : find a more efficient storage than i32, as we discard log2(q)-d bits of information
     for i in 0..u.c.len() {
-        u.set(i, ((u.c[i] as f32 * ((1 << d) as f32 / (q as f32)) ).round() as i32) % (1 << d));
+        u.c[i] = ((u.c[i] as f32 * ((1 << d) as f32 / (q as f32)) ).round() as i32) % (1 << d);
+
+        // positive symetrical modulus
+        if u.c[i] < 0 {
+            u.c[i] += 1 << d;
+        }
     }
 
 
@@ -164,7 +169,7 @@ fn compress(mut u : Vector<n>, d : i32) -> Vector<n>{
 fn compress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
 
     for i in 0..k {
-        u.set(i, compress(u.get(i),d));
+        u.c[i] = compress(u.c[i],d);
     }
 
     return u;
@@ -174,7 +179,7 @@ fn compress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
 fn decompress(mut u : Vector<n>, d : i32) -> Vector<n>{
 
     for i in 0..u.c.len() {
-        u.set(i, ((u.c[i] as f32 * ((q as f32)/ (1 << d) as f32) ).round() as i32) % (1 << d));
+        u.c[i] = (u.c[i] as f32 * ((q as f32)/ (1 << d) as f32) ).round() as i32;
     }
 
 
@@ -185,7 +190,7 @@ fn decompress(mut u : Vector<n>, d : i32) -> Vector<n>{
 fn decompress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
 
     for i in 0..k {
-        u.set(i, decompress(u.get(i),d));
+        u.c[i] = decompress(u.c[i],d);
     }
 
     return u;
@@ -205,7 +210,7 @@ fn round(v : Vector<n>) -> Vector<n>{
     let mut r = empty_vector();
     for i in 0..n {
 
-        let val = v.get(i);
+        let val = v.c[i];
 
         if val.abs() < q/4 {
             r.set(i,0);
@@ -226,7 +231,7 @@ fn round_polyvector(v : PolyVector<k>) -> PolyVector<k>{
 
     let mut r = empty_polyvector();
     for i in 0..k {
-        r.set(i, round(v.get(i)));
+        r.set(i, round(v.c[i]));
     }
 
     return r;
@@ -240,7 +245,7 @@ pub struct EncryptedMessage{
     v : Vector<n>
 }
 /*
-returns [u,v]
+returns [u,v] in their encoded form
 */
 #[allow(non_snake_case)]
 pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : Vector<n>) -> EncryptedMessage{
@@ -255,7 +260,7 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
     let mut r_ntt : PolyVector<k> = empty_polyvector();
 
     for i in 0..k {
-        r_ntt.set(i, ntt::ntt(r.get(i)));
+        r_ntt.set(i, ntt::ntt(r.c[i]));
     }
     
 
@@ -271,14 +276,15 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
     let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r);
 
     for i in 0..k {
-        u.set(i, ntt::intt(u.get(i)));
+        u.set(i, ntt::intt(u.c[i]));
     }
 
     let e1 = generate_noise_polyvector(eta_1);
 
     u.add(e1);
 
-    return EncryptedMessage { u, v };
+    return EncryptedMessage { u:compress_polyvector(u,d_u), v:compress(v,d_v) };
+    //return EncryptedMessage { u, v };
 
 }
 
@@ -286,10 +292,15 @@ pub fn decrypt(EncryptedMessage { u, v }: &mut EncryptedMessage, s : PolyVector<
 
     // m = round(v - s^T.u)
 
+    let u_decompressed = decompress_polyvector(u.clone(),d_u);
+    let mut v_decompressed = decompress(v.clone(),d_v);
+
     // do not modify s, as it could be used for multiple decryption operations
     let s_copy = s.clone();
-    v.sub(s_copy.ntt_dot(*u));
-    return round(*v);
+    //v.sub(s_copy.ntt_dot(*u));
+    //return round(*v);
+    v_decompressed.sub(s_copy.ntt_dot(u_decompressed));
+    return round(v_decompressed);
 
 }
 
@@ -412,6 +423,30 @@ mod tests {
         let noise_polyvector = generate_noise_polyvector(eta_1);
         println!("Noise polyvector: {:?}", noise_polyvector);
     }
+
+    #[test]
+    fn test_compute_t() {
+        let seed_vector = generate_seed_vector();
+        #[allow(non_snake_case)]
+        let A = generate_A_from_seed(seed_vector);
+        let s = generate_noise_polyvector(eta_1);
+        let e = generate_noise_polyvector(eta_2);
+        let t = compute_t(A, s, e);
+        println!("t: {:?}", t);
+    }
+
+    #[test]
+    fn test_compress_decompress() {
+        let noise_vector = generate_noise_vector(eta_1);
+        let compressed = compress(noise_vector.clone(), d_u);
+        let decompressed = decompress(compressed.clone(), d_u);
+        println!("Original: {:?}", noise_vector);
+        println!("Compressed: {:?}", compressed);
+        println!("Decompressed: {:?}", decompressed);
+
+    }
+
+
 
     #[test]
     fn test_encrypt_decrypt() {
