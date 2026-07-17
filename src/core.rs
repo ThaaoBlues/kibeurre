@@ -250,17 +250,10 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
 
 
     r_ntt.c = r_ntt.c.map(ntt::ntt);
-    /*for i in 0..k {
-        r_ntt.c[i] = ntt::ntt(r.c[i]);
-    }*/
-    
-    //println!("t  = {:?}",t);
 
-    // THAT SHIT RETURNS 0 !!!!
-    // IT SOMEHOW MAKES THE ENC/DEC ROUND WORK ????
     //println!("r_ntt = {:?}",r_ntt);
     let mut v : Vector<n> = t.ntt_dot(r_ntt);
-    println!("t after ntt dot with rntt : \n {:?}",v);
+    //println!("t after ntt dot with rntt : \n {:?}",v);
 
 
     v.add(e_2);

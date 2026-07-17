@@ -1,6 +1,5 @@
 use crate::parameters::{n, k,m};
 use crate::ntt;
-use std::ops::Add;
 
 
 const POLYNOMIAL_SIZE : usize = n;
@@ -617,7 +616,6 @@ pub fn mod_inv(zeta : i32,_n : i32) -> i32{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::prelude::ThreadRng;
     use rand::Rng;
 
 #[test]
