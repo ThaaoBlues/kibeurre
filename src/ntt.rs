@@ -24,9 +24,9 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
 
     let mut mtg_p = [MontgomeryForm::new(0);256];
 
-   for i in 0..256{
-        mtg_p[i].set_n(p.c[i]);
-        mtg_p[i].set_a((p.c[i]<<12) % 3329);
+   for (i, mtg) in mtg_p.iter_mut().enumerate(){
+        mtg.set_n(p.c[i]);
+        mtg.set_a((p.c[i]<<12) % 3329);
     }
 
 
@@ -77,7 +77,7 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
     }
 
 
-    return Vector::new(&reduced_p, 3329)
+    Vector::new(&reduced_p, 3329)
 
     // recursive version
     /*let pe = p.get_even_indexes();
@@ -105,9 +105,9 @@ pub fn intt(p : Vector<256>)->Vector<256>{
 
     let mut mtg_p = [MontgomeryForm::new(0);256];
 
-    for i in 0..256{
-        mtg_p[i].set_n(p.c[i]);
-        mtg_p[i].set_a((p.c[i]<<12) % 3329);
+    for (i,mtg) in mtg_p.iter_mut().enumerate(){
+        mtg.set_n(p.c[i]);
+        mtg.set_a((p.c[i]<<12) % 3329);
     }
 
 
@@ -173,7 +173,7 @@ pub fn intt(p : Vector<256>)->Vector<256>{
     // 128^-1 % 3329 = 3303
     ret.scalar_mult(3303);
 
-    return ret;
+    ret
 }
 
 
@@ -194,22 +194,24 @@ pub fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
     // step by 2 as standardised kyber NTT returns degree 1 polynomials
     // instead of an array of constants
 
-    let mut zeta_index : usize = 0;
-    for i in (0..256).step_by(2){
+    let mut i    = 0;
+    for zeta in ZETA_TABLE.iter(){
         let a0 = ntt_a.c[i];
         let a1 = ntt_a.c[i+1];
         let b0 = ntt_b.c[i];
         let b1 = ntt_b.c[i+1];
 
-        ntt_c.c[i] = a0.wrapping_mul(b0).wrapping_add(ZETA_TABLE[zeta_index as usize].wrapping_mul(a1.wrapping_mul(b1)));
+        ntt_c.c[i] = a0.wrapping_mul(b0).wrapping_add(zeta.wrapping_mul(a1.wrapping_mul(b1)));
 
         // x^2 % (x^2+1) = -1
         // -1 = zeta^n/2 
         ntt_c.c[i+1] = a0.wrapping_mul(b1).wrapping_add(a1.wrapping_mul(b0));
-        zeta_index+=1;
+
+
+        i += 2;
     }
 
-    return intt(ntt_c);
+    intt(ntt_c)
 }
 
 
@@ -230,7 +232,7 @@ pub fn compute_zeta_table() -> [i32;128]{
 
     println!("{:?}",z);
 
-    return z;
+    z
 }
 
 
@@ -250,7 +252,7 @@ pub fn compute_inv_zeta_table() -> [i32;128]{
 
     println!("{:?}",z);
 
-    return z;
+    z
 }
 
 
@@ -263,23 +265,23 @@ mod tests {
     fn test_ntt_intt_roundtrip() {
         // Create a simple polynomial: f(x) = 1 + 2x + 3x^2 + ...
         let mut coefficients = [0; 256];
-        for i in 0..256 {
-            coefficients[i] = i as i32;
+        for (i, coeff) in coefficients.iter_mut().enumerate() {
+            *coeff = i as i32;
         }
         let p = Vector::new(&coefficients, 3329);
 
         // Perform NTT then iNTT
-        let ntt_p = ntt(p.clone());
+        let ntt_p = ntt(p);
         let back_p = intt(ntt_p);
         println!("BACK_P = {:?}",back_p);
 
         // Check if we got the original back
-        for i in 0..256 {
+        for (i,coef) in coefficients.iter().enumerate() {
             assert_eq!(
                 back_p.c[i], 
-                coefficients[i], 
+                *coef, 
                 "Roundtrip failed at index {}. Expected {}, got {}", 
-                i, coefficients[i], back_p.c[i]
+                i, *coef, back_p.c[i]
             );
         }
     }
@@ -322,9 +324,11 @@ mod tests {
         }
     }
 
+
+    
     #[test]
     fn test_square_and_mult(){
-        let mut tmp = 0;
+        let mut tmp: u32;
         
         for i in 0..31{
             tmp = square_and_mult(17, i, 3329);

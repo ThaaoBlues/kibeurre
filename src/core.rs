@@ -3,9 +3,9 @@ use std::ops::Shl;
 use crate::math_utils::{PolyMatrix,PolyVector,Vector,empty_polymatrix,empty_polyvector,empty_vector};
 
 use crate::ntt;
-use rand;
+use rand::random;
 use shake::{ExtendableOutput, Update, XofReader};
-use crate::parameters::{n, k, q,eta_1, eta_2, d_u, d_v,m};
+use crate::parameters::{D_U, D_V, ETA_1, ETA_2, k, m, n, q};
 use crate::format_utils::{string_to_vectors,vectors_to_string};
 
 
@@ -26,17 +26,16 @@ fn cbd_sample(eta : i16) -> i16 {
 
     let mut sum : i16 = 0;
 
-    let p: i32 = rand::random::<i32>();
+    let p: i32 = random::<i32>();
 
 
 
     for i in 0..eta {
-        sum += ((p & (1 << i)) >> i) as i16 - ((p & (1 << i+16)) >> i+16) as i16;
+        sum += ((p & (1 << i)) >> i) as i16 - ((p & (1 << (i+16) )) >> (i+16) ) as i16;
 
     }
 
-
-    return  sum; // [-eta, eta]
+    sum // [-eta, eta]
     
 }
 
@@ -45,13 +44,10 @@ fn cbd_sample(eta : i16) -> i16 {
 
 pub fn generate_seed_vector() -> Vector<n>{
 
-    let mut r  :[i32; n] = [0; n];
-    for i in 0..n{
-        // random bits
-        r[i] = (rand::random::<u8>() % 2) as i32;
-    }
+    let r  :[i32; n] = [0; n];
+    let r = r.map(|_| (rand::random::<u8>() % 2) as i32);
 
-    return Vector::new(&r,m);
+    Vector::new(&r,m)
 
 }
 
@@ -88,7 +84,7 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
                 let mut buf: [u8; 2] = [0; 2];
                 reader.read(&mut buf);
 
-                generated_polynomial.set(l,((buf[0] as i32).shl(8) as i32).wrapping_add(buf[1] as i32) % m as i32);
+                generated_polynomial.set(l,((buf[0] as i32).shl(8) as i32).wrapping_add(buf[1] as i32) % m);
                 
             }
             
@@ -100,7 +96,7 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
     }
 
 
-    return A_ntt;
+    A_ntt
 
 }
 
@@ -118,7 +114,7 @@ fn generate_noise_vector(eta : i16) -> Vector<n>{
         let sample = cbd_sample(eta);
         random_vector.set(i, sample as i32);
     }
-    return random_vector;
+    random_vector
 }
 
 
@@ -128,7 +124,8 @@ pub fn generate_noise_polyvector(eta : i16) -> PolyVector<k>{
     for i in 0..k {
         random_polyvector.set(i, generate_noise_vector(eta));
     }
-    return random_polyvector;
+
+    random_polyvector
 }
 
 
@@ -139,8 +136,7 @@ pub fn compute_t(mut A : PolyMatrix<k,k>, s : PolyVector<k>, e : PolyVector<k>) 
     
     let mut t : PolyVector<k> = A.ntt_mult_vec(s);
     t.add(e);
-
-    return t;
+    t
 }
 
 
@@ -160,7 +156,7 @@ fn compress(mut u : Vector<n>, d : i32) -> Vector<n>{
     }
 
 
-    return u;
+    u
 
 }
 
@@ -172,7 +168,7 @@ fn compress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
         u.c[i] = compress(u.c[i],d);
     }
 
-    return u;
+    u
 
 }
 
@@ -183,7 +179,7 @@ fn decompress(mut u : Vector<n>, d : i32) -> Vector<n>{
     }
 
 
-    return u;
+    u
 
 }
 
@@ -193,7 +189,7 @@ fn decompress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
         u.c[i] = decompress(u.c[i],d);
     }
 
-    return u;
+    u
 
 }
 
@@ -223,27 +219,20 @@ fn round(v : Vector<n>) -> Vector<n>{
 
 
 
-    return r;
+    r
 
 }
 
-fn round_polyvector(v : PolyVector<k>) -> PolyVector<k>{
 
-    let mut r = empty_polyvector();
-    for i in 0..k {
-        r.set(i, round(v.c[i]));
-    }
-
-    return r;
-
-}
 
 
 #[derive(Debug)]
 pub struct EncryptedMessage{
-    u : PolyVector<k>,
-    v : Vector<n>
+    pub u : PolyVector<k>,
+    pub v : Vector<n>
 }
+
+
 /*
 returns [u,v] in their encoded form
 */
@@ -254,20 +243,29 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
     // v = t^T.r + e_2 + round(q/2)*m
 
 
-    let e_2 : Vector<n>= generate_noise_vector(eta_2);
+    let e_2 : Vector<n>= generate_noise_vector(ETA_2);
 
     
-    let mut r_ntt : PolyVector<k> = empty_polyvector();
+    let mut r_ntt : PolyVector<k> = generate_noise_polyvector(ETA_1);
 
-    for i in 0..k {
-        r_ntt.set(i, ntt::ntt(r.c[i]));
-    }
+
+    r_ntt.c = r_ntt.c.map(ntt::ntt);
+    /*for i in 0..k {
+        r_ntt.c[i] = ntt::ntt(r.c[i]);
+    }*/
     
+    //println!("t  = {:?}",t);
 
+    // THAT SHIT RETURNS 0 !!!!
+    // IT SOMEHOW MAKES THE ENC/DEC ROUND WORK ????
+    //println!("r_ntt = {:?}",r_ntt);
     let mut v : Vector<n> = t.ntt_dot(r_ntt);
+    println!("t after ntt dot with rntt : \n {:?}",v);
+
+
     v.add(e_2);
 
-    let mut tmp = msg.clone();
+    let mut tmp = msg;
     tmp.scalar_mult(q/2);
     v.add(tmp);
 
@@ -275,32 +273,32 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, r : PolyVector<k>, msg : V
     // u := NTT−1(AT◦r) + e1 
     let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r);
 
-    for i in 0..k {
-        u.set(i, ntt::intt(u.c[i]));
-    }
+    //println!("u before ntt : {:?}",u);
 
-    let e1 = generate_noise_polyvector(eta_1);
+    u.c = u.c.map(ntt::intt);
+
+    let e1 = generate_noise_polyvector(ETA_1);
 
     u.add(e1);
 
-    return EncryptedMessage { u:compress_polyvector(u,d_u), v:compress(v,d_v) };
+    EncryptedMessage { u:compress_polyvector(u,D_U), v:compress(v,D_V) }
     //return EncryptedMessage { u, v };
 
 }
 
-pub fn decrypt(EncryptedMessage { u, v }: &mut EncryptedMessage, s : PolyVector<k>) -> Vector<n>{
+pub fn decrypt(EncryptedMessage { u, v }: & EncryptedMessage, s : PolyVector<k>) -> Vector<n>{
 
     // m = round(v - s^T.u)
 
-    let u_decompressed = decompress_polyvector(u.clone(),d_u);
-    let mut v_decompressed = decompress(v.clone(),d_v);
+    let mut u_decompressed = decompress_polyvector(*u,D_U);
+    u_decompressed.c = u_decompressed.c.map(ntt::ntt);
+    let mut v_decompressed = decompress(*v,D_V);
 
     // do not modify s, as it could be used for multiple decryption operations
-    let s_copy = s.clone();
     //v.sub(s_copy.ntt_dot(*u));
     //return round(*v);
-    v_decompressed.sub(s_copy.ntt_dot(u_decompressed));
-    return round(v_decompressed);
+    v_decompressed.sub(s.ntt_dot(u_decompressed));
+    round(v_decompressed)
 
 }
 
@@ -320,7 +318,7 @@ pub fn encrypt_string(input: &str,PublicKey { A, t, seed : _ }: &PublicKey,r : P
         encrypted_chunks.push(encrypted_chunk);
     }
 
-    return encrypted_chunks;
+    encrypted_chunks
 }
 
 
@@ -336,49 +334,51 @@ pub fn decrypt_string(encrypted_chunks: &mut Vec<EncryptedMessage>, PrivateKey {
         decrypted_chunks.push(decrypted_chunk);
     }
 
-    return vectors_to_string(decrypted_chunks);
+    vectors_to_string(decrypted_chunks)
 }
 
 
 #[derive(Clone)]
+#[allow(non_snake_case)]
 pub struct PublicKey{
-    #[allow(non_snake_case)]
-    A : PolyMatrix<k,k>,
-    t : PolyVector<k>,
-    seed : Vector<n>
+    pub A : PolyMatrix<k,k>,
+    pub t : PolyVector<k>,
+    #[allow(unused)]
+    pub seed : Vector<n>
 }
 
 impl PublicKey {
 
     pub fn new(seed : Vector<n>,t : PolyVector<k>)->PublicKey{
-        return PublicKey { A: generate_A_from_seed(seed), t: t, seed }
+        PublicKey { A: generate_A_from_seed(seed),t, seed }
     }
 }
 
 #[derive(Clone)]
 pub struct PrivateKey{
-    s : PolyVector<k>
+    pub s : PolyVector<k>
 }
 
 impl PrivateKey {
 
     pub fn new(s : PolyVector<k>)->PrivateKey{
-        return PrivateKey { s }
+        PrivateKey { s }
     }
 }
 
 
 pub fn generate_key_pair() -> (PublicKey, PrivateKey) {
     let seed_vector = generate_seed_vector();
-    let A = generate_A_from_seed(seed_vector.clone());
-    let s = generate_noise_polyvector(eta_1);
-    let e = generate_noise_polyvector(eta_2);
+    #[allow(non_snake_case)]
+    let A = generate_A_from_seed(seed_vector);
+    let s = generate_noise_polyvector(ETA_1);
+    let e = generate_noise_polyvector(ETA_2);
     let t = compute_t(A, s, e);
 
     let public_key = PublicKey::new(seed_vector, t);
     let private_key = PrivateKey::new(s);
 
-    return (public_key, private_key);
+    (public_key, private_key)
 }
 
 
@@ -388,12 +388,13 @@ pub fn generate_key_pair() -> (PublicKey, PrivateKey) {
 mod tests {
     use super::*;
 
+    use std::ops::RangeInclusive;
 
     #[test]
     fn test_cbd_sample() {
         let sample = cbd_sample(2);
-        assert!(sample >= -2 && sample <= 2);
-    
+
+        assert!(RangeInclusive::new(-2, 2).contains(&sample));    
     }
     
     #[test]
@@ -414,13 +415,13 @@ mod tests {
 
     #[test]
     fn test_generate_noise_vector() {
-        let noise_vector = generate_noise_vector(eta_1);
+        let noise_vector = generate_noise_vector(ETA_1);
         println!("Noise vector : {:?}",noise_vector);
     }
 
     #[test]
     fn test_generate_noise_polyvector() {
-        let noise_polyvector = generate_noise_polyvector(eta_1);
+        let noise_polyvector = generate_noise_polyvector(ETA_1);
         println!("Noise polyvector: {:?}", noise_polyvector);
     }
 
@@ -429,17 +430,17 @@ mod tests {
         let seed_vector = generate_seed_vector();
         #[allow(non_snake_case)]
         let A = generate_A_from_seed(seed_vector);
-        let s = generate_noise_polyvector(eta_1);
-        let e = generate_noise_polyvector(eta_2);
+        let s = generate_noise_polyvector(ETA_1);
+        let e = generate_noise_polyvector(ETA_2);
         let t = compute_t(A, s, e);
         println!("t: {:?}", t);
     }
 
     #[test]
     fn test_compress_decompress() {
-        let noise_vector = generate_noise_vector(eta_1);
-        let compressed = compress(noise_vector.clone(), d_u);
-        let decompressed = decompress(compressed.clone(), d_u);
+        let noise_vector = generate_noise_vector(ETA_1);
+        let compressed = compress(noise_vector, D_U);
+        let decompressed = decompress(compressed, D_U);
         println!("Original: {:?}", noise_vector);
         println!("Compressed: {:?}", compressed);
         println!("Decompressed: {:?}", decompressed);
@@ -453,12 +454,12 @@ mod tests {
         let seed_vector = generate_seed_vector();
         #[allow(non_snake_case)]
         let A = generate_A_from_seed(seed_vector);
-        let s = generate_noise_polyvector(eta_1);
-        let e = generate_noise_polyvector(eta_2);
-        let t = compute_t(A, s.clone(), e);
-        let r = generate_noise_polyvector(eta_1);
+        let s = generate_noise_polyvector(ETA_1);
+        let e = generate_noise_polyvector(ETA_2);
+        let t = compute_t(A, s, e);
+        let r = generate_noise_polyvector(ETA_1);
         let msg = generate_seed_vector(); // using seed vector as a message for testing
-        let mut encrypted_message = encrypt(A, t, r, msg.clone());
+        let mut encrypted_message = encrypt(A, t, r, msg);
         println!("Encrypted message: u = {:?}, v = {:?}", encrypted_message.u, encrypted_message.v);
         let decrypted_msg = decrypt(&mut encrypted_message, s);
 

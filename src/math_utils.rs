@@ -1,11 +1,6 @@
-
-use std::ops::Add;
-use crate::parameters::{n, k, q,eta_1, eta_2, d_u, d_v,m};
+use crate::parameters::{n, k,m};
 use crate::ntt;
-use rand::Rng;
-use rand::rngs::ThreadRng;
-
-
+use std::ops::Add;
 
 
 const POLYNOMIAL_SIZE : usize = n;
@@ -36,15 +31,12 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         Vector { c : *val, m : _m}
     }
 
-    fn size(&self)->usize{
-        return self.c.len();
-    }
-
     pub fn set(&mut self,index : usize,v : i32){
         self.c[index] = v;
     }
+
     pub fn get(&self, index : usize)->i32{
-        return self.c[index];
+        self.c[index]
     }
 
 
@@ -103,52 +95,6 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
     }
 
 
-    fn get_odd_indexes<const HALF_SIZE: usize>(&self) -> Vector<HALF_SIZE>{
-        
-        assert_eq!(HALF_SIZE, VECTOR_SIZE/2);
-
-        let mut v = Vector::new(&[0;HALF_SIZE], self.m);
-
-
-        for i in 0..HALF_SIZE{ 
-
-            v.c[i] = self.c[2*i+1];
-            
-        }
-
-        return v;
-    }
-
-
-    fn get_even_indexes<const HALF_SIZE: usize>(&self) -> Vector<HALF_SIZE>{
-        
-        // rust is an useless piece of shit in its current state
-        // you can't even perform calculations on genericity parameter
-        // and put it as return
-        assert_eq!(HALF_SIZE, VECTOR_SIZE/2);
-
-        let mut v = Vector::new(&[0;HALF_SIZE], self.m);
-
-
-        for i in 0..HALF_SIZE{ 
-
-            v.c[i] = self.c[2*i];
-            
-        }
-
-        return v;
-    }
-
-
-    pub fn to_string(&self)->String{
-        let mut ret : String = String::new();
-
-        for i in 0..VECTOR_SIZE {
-           ret.push_str(&format!("{}",self.c[i]));
-        }
-
-        return ret;
-    }
 
     pub fn get_bytes(&self)->Vec<u8>{
         let mut ret : Vec<u8> = Vec::new();
@@ -157,7 +103,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
            ret.extend_from_slice(&self.c[i].to_le_bytes());
         }
 
-        return ret;
+        ret
     }
 
 }
@@ -183,15 +129,11 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
         PolyVector { c : *val, m : _m}
     }
 
-    fn size(&self)->usize{
-        return self.c.len();
-    }
-
     pub fn set(&mut self,index : usize,v : Vector<POLYNOMIAL_SIZE>){
         self.c[index] = v;
     }
     pub fn get(&self, index : usize)->Vector<POLYNOMIAL_SIZE>{
-        return self.c[index];
+        self.c[index]
     }
 
 
@@ -216,17 +158,26 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
         */
 
-        let ret : Vector<POLYNOMIAL_SIZE> = Vector::new(&[0;POLYNOMIAL_SIZE],self.m);
+        
 
-        for i in 0..VECTOR_SIZE {
-            let tmp : Vector<POLYNOMIAL_SIZE> = ntt::poly_mult(self.c[i],v2.c[i]);
-            for j in 0..POLYNOMIAL_SIZE {
-                ret.c[j].add(tmp.c[j]);
+        let mut ret : Vector<POLYNOMIAL_SIZE> = Vector::new(&[0;POLYNOMIAL_SIZE],self.m);
+
+        for poly_index in 0..VECTOR_SIZE {
+            let tmp : Vector<POLYNOMIAL_SIZE> = ntt::poly_mult(self.c[poly_index],v2.c[poly_index]);
+            //println!("tmp : {:?}",tmp);
+            for poly_coef_index in 0..POLYNOMIAL_SIZE {
+                
+                ret.c[poly_index] += tmp.c[poly_coef_index];
             }
             
         }
 
-        return ret;
+        for poly_coef_index in 0..POLYNOMIAL_SIZE {    
+            ret.c[poly_coef_index] %= n as i32;
+        }
+
+        //println!("ret : {:?}",ret);
+        ret
     
     }
 
@@ -241,17 +192,7 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
     }
 
-
-
-    pub fn to_string(&self)->String{
-        let mut ret : String = String::new();
-
-        for i in 0..VECTOR_SIZE {
-           ret.push_str(&format!("{:?}",self.c[i]));
-        }
-
-        return ret;
-    }
+    
 
 
 }
@@ -286,21 +227,15 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
         // and the second by its columns
 
         // rows
-        let mut r_v : [PolyVector<CN>;RN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],_m);CN],_m);RN];
+        let r_v : [PolyVector<CN>;RN] = val;
 
         // columns
         let mut c_v : [PolyVector<RN>;CN] = [PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],_m);RN],_m);CN];
 
-        for i in 0..CN{
-            r_v[i] = val[i];
-        
-        }
 
-
-
-        for i in 0..CN{
-            for j in 0..RN {
-                c_v[i].c[j] = val[j].c[i];
+        for (i, col) in c_v.iter_mut().enumerate(){
+            for (j,new_row) in val.iter().enumerate()  {
+                col.c[j] = new_row.c[i];
             }
         }
         
@@ -327,10 +262,11 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
             ret.c[i] = self.row_vecs[i].ntt_dot(v);
         }
 
-        return ret;
+        ret
     }
 
 
+    #[allow(non_snake_case)]
     pub fn matmul(&mut self, B : PolyMatrix<CN,RN>)->PolyMatrix<CN,RN>{
         
         let mut ret : PolyMatrix<CN,RN> = PolyMatrix::new([PolyVector::new(&[Vector::new(&[0;POLYNOMIAL_SIZE],self.m);RN],self.m);CN],self.m);
@@ -369,7 +305,7 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
     }
 
     pub fn get_row(&self, row_index : usize) -> PolyVector<CN>{
-        return self.row_vecs[row_index];
+        self.row_vecs[row_index]
     }
 
     pub fn set_col(&mut self, col_index : usize, v : PolyVector<RN>){
@@ -427,8 +363,8 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
 
 
         for i in 0..CN{
-            for j in 0..RN {
-                c_v[i].c[j] = val[j][i];
+            for (j,new_row) in val.iter().enumerate() {
+                c_v[i].c[j] = new_row[i];
             }
         }
         
@@ -446,10 +382,10 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
             ret.c[i] = self.row_vecs[i].dot(v);
         }
 
-        return ret;
+        ret
     }
 
-
+    #[allow(non_snake_case)]
     pub fn matmul(&mut self, B : Matrix<CN,RN>)->Matrix<CN,RN>{
         
         let mut ret : Matrix<CN,RN> = Matrix::new([[0;RN];CN],self.m);
@@ -468,13 +404,7 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
 
     }
 
-    fn transpose(& self) -> Matrix<CN,RN>{
-        let mut ret : Matrix<CN,RN> = Matrix::new([[0;RN];CN],self.m);
-        ret.col_vecs = self.row_vecs;
-        ret.row_vecs = self.col_vecs;
 
-        ret
-    }
 
     pub fn set_row(&mut self, row_index : usize, v : Vector<CN>){
         self.row_vecs[row_index] = v;
@@ -488,7 +418,7 @@ impl <const RN : usize, const CN : usize> Matrix<{RN},{CN}>{
     }
 
     pub fn get_row(&self, row_index : usize) -> Vector<CN>{
-        return self.row_vecs[row_index];
+        self.row_vecs[row_index]
     }
 
     pub fn set_col(&mut self, col_index : usize, v : Vector<RN>){
@@ -552,7 +482,7 @@ impl MontgomeryForm{
     }
 
     pub fn get_a(&self)-> i32{
-        return self.a;
+        self.a
     }
 
     pub fn mult(& self, b : i32) -> MontgomeryForm{
@@ -575,7 +505,7 @@ impl MontgomeryForm{
         
         let c_b = ab.reduction();
 
-        return MontgomeryForm { a:c_b, n: 0, q: self.q, r_pow:self.r_pow,r: self.r, r_1: self.r_1, k: self.k};
+        MontgomeryForm { a:c_b, n: 0, q: self.q, r_pow:self.r_pow,r: self.r, r_1: self.r_1, k: self.k}
         
     }
 
@@ -592,12 +522,12 @@ impl MontgomeryForm{
         //println!("{0} = {1} ?",(u % self.q), i32::try_from((i64::from(self.a)*i64::from(self.r_1)) % i64::from(self.q)).unwrap() );
 
         
-        if(u < self.q){
+        if u < self.q {
             self.n = u;
-            return u;
+            u
         }else{
             self.n = u-self.q;
-            return self.n;
+            self.n
         }
 
         
@@ -627,7 +557,7 @@ pub fn square_and_mult(x : u32, e : u32, _m : u32) -> u32{
     while exp > 1 {
 
         iter = iter *iter % _m;
-        exp = exp >> 1;
+        exp >>= 1;
         // current_pow = current_pow + k
         if exp % 2 == 1 {
             ret = ret * iter % _m;
@@ -638,14 +568,14 @@ pub fn square_and_mult(x : u32, e : u32, _m : u32) -> u32{
         ret = ret*x % _m;
     }
 
-    return ret;
+    ret
 }
 
 
 
 pub fn mod_inv(zeta : i32,_n : i32) -> i32{
     let mut r : i32 = 0;
-    let mut r_1 : i32 = 0;
+    let mut r_1 : i32;
     let mut u : i32 = 0;
     let mut v : i32 = 1;
     let mut u_1 : i32 = 1;
@@ -657,8 +587,8 @@ pub fn mod_inv(zeta : i32,_n : i32) -> i32{
 
     // au + bv = pgcd(a,b) = 1
     // b = n ; a = zeta; u = zeta⁻¹
-    let mut tmp = 0;
-    while (r != 1) {
+    let mut tmp:i32;
+    while r != 1 {
         
         r_1 = r;
         r = a % b;
@@ -676,7 +606,7 @@ pub fn mod_inv(zeta : i32,_n : i32) -> i32{
         
     }
     println!("u={u}, v={v}");
-    return v;
+    v
 }
 
 
@@ -687,6 +617,9 @@ pub fn mod_inv(zeta : i32,_n : i32) -> i32{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::prelude::ThreadRng;
+    use rand::Rng;
+
 #[test]
 fn test_vector_add_with_modulo() {
     // (2000 + 1500) % 3329 = 3500 % 3329 = 171
@@ -739,11 +672,11 @@ fn test_matrix_matmul_modulo() {
 
 fn test_montgomery_form(){
 
-    let mut rng: ThreadRng = rand::rng();
+    let mut rng = rand::rng();
     for _ in 0..1000{
 
-        let a : i32 = (rng.next_u32() % 1<<14).try_into().unwrap();
-        let _m : i32 = (rng.next_u32() %1<<14).try_into().unwrap();
+        let a : i32 = (rng.next_u32() % (1<<14) ).try_into().unwrap();
+        let _m : i32 = (rng.next_u32() % (1<<14) ).try_into().unwrap();
 
         let mtg = MontgomeryForm::new(a);
         let res = mtg.mult(_m).to_standard();

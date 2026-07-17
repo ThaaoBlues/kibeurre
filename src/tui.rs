@@ -17,7 +17,7 @@ use ratatui::{
 use std::io;
 
 // Pulling in your modules and constants
-use crate::parameters::{d_u, d_v, eta_1, eta_2, k, m, n, q};
+use crate::parameters::{D_U, D_V, ETA_1, ETA_2, k, m, n, q};
 
 
 use crate::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t};
@@ -65,8 +65,8 @@ impl AppState {
         let seed_vector = generate_seed_vector();
         #[allow(non_snake_case)]
         let A = generate_A_from_seed(seed_vector);
-        let s = generate_noise_polyvector(eta_1);
-        let e = generate_noise_polyvector(eta_2);
+        let s = generate_noise_polyvector(ETA_1);
+        let e = generate_noise_polyvector(ETA_2);
         let t = compute_t(A.clone(), s.clone(), e);
 
         
@@ -86,12 +86,12 @@ impl AppState {
         // 3. Encryption
         self.steps_log.push(CryptoStep {
             name: "[3] Encryption (Capsule)".to_string(),
-            details: format!("Generated error vectors (η1={eta_1}, η2={eta_2}).\nComputed Vector pair (u, v)."),
+            details: format!("Generated error vectors (η1={ETA_1}, η2={ETA_2}).\nComputed Vector pair (u, v)."),
         });
 
         let mut encrypted_chunks = Vec::new();
         for (_, chunk) in msg.iter().enumerate() {
-            let r = generate_noise_polyvector(eta_1);
+            let r = generate_noise_polyvector(ETA_1);
             encrypted_chunks.push(encrypt(A, t, r, chunk.clone()));
         }
 
@@ -263,11 +263,11 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
          • Field (q): {}\n \
          • η1 (Noise): {}\n \
          • η2 (Noise): {}\n \
-         • d_u (Bits): {}\n \
-         • d_v (Bits): {}\n \
+         • D_U (Bits): {}\n \
+         • D_V (Bits): {}\n \
          • Ring Mod (m): {}\n\n \
          ",
-        n, k, q, eta_1, eta_2, d_u, d_v, m
+        n, k, q, ETA_1, ETA_2, D_U, D_V, m
     );
     let params_widget = Paragraph::new(param_text)
         .block(Block::default().borders(Borders::ALL).title(" Kyber Configuration ").border_style(Style::default().fg(Color::Magenta)))

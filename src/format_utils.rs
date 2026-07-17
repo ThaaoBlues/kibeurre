@@ -1,5 +1,5 @@
 use crate::math_utils::{Vector,empty_vector};
-use crate::parameters::{n, m};
+use crate::parameters::{n};
 
 
 /*
@@ -23,7 +23,9 @@ pub fn string_to_vectors(input: &str) -> Vec<Vector<n>> {
         }
         vectors.push(vector);
     }
-    return vectors;
+
+    
+    vectors
 }
 
 
@@ -54,6 +56,7 @@ pub fn vectors_to_string(vectors: Vec<Vector<n>>) -> String {
             
         }
     }
-    return String::from_utf8(bytes).unwrap_or_else(|_| String::from("Invalid UTF-8"));
+
+    String::from_utf8(bytes).unwrap_or_else(|_| String::from("Invalid UTF-8"))
 }
 
