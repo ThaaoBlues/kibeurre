@@ -301,3 +301,8 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
         
     f.render_widget(logs_widget, left_chunks[1]);
 }
+
+
+fn main(){
+    let _ = tui::mainloop();
+}

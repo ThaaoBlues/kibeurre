@@ -69,18 +69,30 @@ But it looks cool !
 - checks if decryption was successful
 
 
-# Ugly plot for a simple encryption/decryption benchmark
+# Ugly plots
 
-![Ugly plot for a simple encryption/decryption benchmark](benchmark_results.png)
+## Encryption benchmark
+![Ugly plot for a simple encryption benchmark](benchmark_results/encryption/lines.svg)
 
-> I did not have time yet to figure out why those obvious steps
-
-We can see that thoses steps happen every 32 bytes of input string data. My deduction is that the steps are somehow due to the addition of one more Vector<> of 256 bits (represented as i32 => not optimized) to encode/decode. It would explain the "stairs" shape as we only add one vectore evevery 256 bits of input data.
+![Ugly plot for a simple encryption benchmark](benchmark_results/encryption/violin.svg)
 
 
-_Disclaimer : As with the terminal user interface, the fancy dotter lines in the graph have been added with the help of Gemini_
+## Decryption benchmark
+![Ugly plot for a simple decryption benchmark](benchmark_results/decryption/lines.svg)
+
+![Ugly plot for a simple decryption benchmark](benchmark_results/decryption/violin.svg)
+
+
+We can see that thoses steps happen every 32 bytes of input string data. 
+My deduction is that the steps are somehow due to the addition of one more Vector<> of 256 bits (represented as i32 => not optimized) to encode/decode. It would explain the "stairs" shape as we only add one vectore evevery 256 bits of input data.
+
+The encryption time gets unstable, and that without notable exceptions, as we add vectors to input.
+But still largely follows the steps pattern. 
+
+Decryption time gets unstable too but the unstability seem to be less correlated to the input size, as this trend is present but with notable examples that are not following it, unlike encryption.
+The steps are still dominating.
+
 
 ## TOUDOU
 - faire les tests sur les vecteurs de tests officiels
-- fix all warnings
 - clean the code
