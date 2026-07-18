@@ -26,7 +26,6 @@ Contains all basic vector and matrices operations in Z/qZ and Rq :
 - I use Montgomery method to speedup modulus computation when multiplying two numbers (sadly not by much)
 
 
-
 # NTT (ntt.rs)
 
 I first learned NTT throught theses ressources : 
@@ -71,16 +70,25 @@ But it looks cool !
 
 # Ugly plots
 
-## Encryption benchmark
-![Ugly plot for a simple encryption benchmark](benchmark_results/encryption/lines.svg)
+## Test hardware informations
+OS: CachyOS x86_64
+Kernel: Linux 7.1.3-2-cachyos
+CPU: AMD Ryzen 5 7640U (12) @ 4.97 GHz
+RAM: 16Gb
 
-![Ugly plot for a simple encryption benchmark](benchmark_results/encryption/violin.svg)
+
+## Computation time
+
+### Encryption benchmark
+![Ugly plot for a simple encryption benchmark](benchmark_results/cpu_time/encryption/lines.svg)
+
+![Ugly plot for a simple encryption benchmark](benchmark_results/cpu_time/encryption/violin.svg)
 
 
 ## Decryption benchmark
-![Ugly plot for a simple decryption benchmark](benchmark_results/decryption/lines.svg)
+![Ugly plot for a simple decryption benchmark](benchmark_results/cpu_time/decryption/lines.svg)
 
-![Ugly plot for a simple decryption benchmark](benchmark_results/decryption/violin.svg)
+![Ugly plot for a simple decryption benchmark](benchmark_results/cpu_time/decryption/violin.svg)
 
 
 We can see that thoses steps happen every 32 bytes of input string data. 
@@ -91,6 +99,20 @@ But still largely follows the steps pattern.
 
 Decryption time gets unstable too but the unstability seem to be less correlated to the input size, as this trend is present but with notable examples that are not following it, unlike encryption.
 The steps are still dominating.
+
+
+## CPU Cycles
+
+### Encryption benchmark
+![Ugly plot for a simple encryption benchmark](benchmark_results/cpu_cycles/encryption/lines.svg)
+
+![Ugly plot for a simple encryption benchmark](benchmark_results/cpu_cycles/encryption/violin.svg)
+
+
+### Decryption benchmark
+![Ugly plot for a simple decryption benchmark](benchmark_results/cpu_cycles/decryption/lines.svg)
+
+![Ugly plot for a simple decryption benchmark](benchmark_results/cpu_cycles/decryption/violin.svg)
 
 
 ## TOUDOU
