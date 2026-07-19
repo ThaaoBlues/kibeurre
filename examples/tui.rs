@@ -17,11 +17,11 @@ use ratatui::{
 use std::io;
 
 // Pulling in your modules and constants
-use crate::parameters::{D_U, D_V, ETA_1, ETA_2, k, m, n, q};
+use kibeurre::parameters::{D_U, D_V, ETA_1, ETA_2, k, m, n, q};
 
 
-use crate::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t};
-use crate::format_utils::{string_to_vectors, vectors_to_string};
+use kibeurre::core::{encrypt, decrypt, generate_seed_vector, generate_A_from_seed, generate_noise_polyvector, compute_t};
+use kibeurre::format_utils::{string_to_vectors, vectors_to_string};
 
 
 /// Tracks the lifecycle events of the encryption run
@@ -67,7 +67,7 @@ impl AppState {
         let A = generate_A_from_seed(seed_vector);
         let s = generate_noise_polyvector(ETA_1);
         let e = generate_noise_polyvector(ETA_2);
-        let t = compute_t(A.clone(), s.clone(), e);
+        let t = compute_t(A, s, e);
 
         
         let msg = string_to_vectors(&self.input_buffer);
@@ -304,5 +304,5 @@ fn ui(f: &mut ratatui::Frame, app: &AppState) {
 
 
 fn main(){
-    let _ = tui::mainloop();
+    let _ = mainloop();
 }

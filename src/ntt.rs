@@ -22,7 +22,7 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
 
     // built Montgomery rpz of the vector
 
-    let mut mtg_p = [MontgomeryForm::new(0);256];
+    let mut mtg_p: [MontgomeryForm; 256] = [MontgomeryForm::new(0);256];
 
    for (i, mtg) in mtg_p.iter_mut().enumerate(){
         mtg.set_n(p.c[i]);

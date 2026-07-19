@@ -1,5 +1,3 @@
-use std::ops::Shl;
-
 use crate::math_utils::{PolyMatrix,PolyVector,Vector,empty_polymatrix,empty_polyvector,empty_vector};
 
 use crate::ntt;
@@ -69,22 +67,22 @@ pub fn generate_A_from_seed(seed : Vector<n>) -> PolyMatrix<k,k>{
 
     for i in 0..k {
         for j in 0..k {
+            let mut hasher = shake::Shake128::default();
 
-            for l in 0..n {
-                let mut hasher = shake::Shake128::default();
+            // 2. Feed data into the hasher
+            // log2(m) = 12 bits par coef de polynome ? 
+            hasher.update(&seed.get_bytes());
+            hasher.update(&[i as u8, j as u8]);
+            // log2(m) round = 12 bits => u16
+            // one polynomial = 12*256 bits = 12*64 bytes => 2*u8*256
 
-                // 2. Feed data into the hasher
-                // log2(m) = 12 bits par coef de polynome ? 
-                hasher.update(&seed.get_bytes());
-                hasher.update(&[i as u8, j as u8]);
-                
-                let mut reader = hasher.finalize_xof();
+            let mut reader = hasher.finalize_xof();
+      
+            let mut buf: [u8; 2*256] = [0; 2*256];
+            reader.read(&mut buf);
 
-                // log2(m) round = 12 bits => u16
-                let mut buf: [u8; 2] = [0; 2];
-                reader.read(&mut buf);
-
-                generated_polynomial.set(l,((buf[0] as i32).shl(8) as i32).wrapping_add(buf[1] as i32) % m);
+            for l in (0..n).step_by(2) {                
+                generated_polynomial.c[l] = ((buf[l] as i32) << 8).wrapping_add(buf[l+1] as i32) % m;
                 
             }
             

@@ -171,7 +171,7 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
             
         }
 
-        for poly_coef_index in 0..POLYNOMIAL_SIZE {    
+        for poly_coef_index in (0..POLYNOMIAL_SIZE).rev() {    
             ret.c[poly_coef_index] %= n as i32;
         }
 
