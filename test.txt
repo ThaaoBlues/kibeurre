@@ -1,5 +1,3 @@
-use std::vec;
-
 use crate::parameters::{n, k,q};
 use crate::ntt;
 
@@ -48,7 +46,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
 
         for i in 0..VECTOR_SIZE {
-            self.c[i] = ((self.c[i] + v2.c[i]) % self.m + self.m) % self.m;
+            self.c[i] = (self.c[i] + v2.c[i]) % self.m;
         }
 
         //Vector::new( &tmp);
@@ -62,7 +60,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
 
         for i in 0..VECTOR_SIZE {
-            self.c[i] = ((self.c[i] - v2.c[i]) % self.m + self.m) % self.m;
+            self.c[i] = (self.c[i] - v2.c[i]) % self.m;
         }
 
         //Vector::new( &tmp);
@@ -77,52 +75,40 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
 
 
         for i in 0..VECTOR_SIZE {
-            //let tmp = MontgomeryForm::new(self.c[i]);
-            //ret += tmp.mult(v2.c[i]).to_standard();
-
-            ret = (((ret + (self.c[i] * v2.c[i]) % self.m) % self.m) + self.m) % self.m;
+            let tmp = MontgomeryForm::new(self.c[i]);
+            ret += tmp.mult(v2.c[i]).to_standard();
         }
 
         //println!("{:?} DOT {:?} = {}",self, v2,ret);
         ret % self.m
     }
 
+
+
     pub fn scalar_mult(&mut self,v : i32){
 
         for i in 0..VECTOR_SIZE {
-            //let tmp = MontgomeryForm::new(v);
-            //self.c[i] = tmp.mult(self.c[i]).to_standard();
-            self.c[i] = ((self.c[i] * v) % self.m + self.m) % self.m;
+            let tmp = MontgomeryForm::new(v);
+            self.c[i] = tmp.mult(self.c[i]).to_standard();
         } 
 
     }
 
 
 
-    pub fn encode(&self, nb_bits : usize)->Vec<u8>{
-        // encode coefficients on 12 bits 
+    pub fn encode(&self, nb_bits: u8){
+        
+    }
 
-        let bit_size = nb_bits*POLYNOMIAL_SIZE;
-        let byte_size = bit_size.div_ceil(8);
+    pub fn get_bytes_compressed(&self)->Vec<u8>{
+        let mut ret : Vec<u8> = Vec::new();
 
-        let mut ret : Vec<u8> = vec![0u8;byte_size];
-        let mut bit_index = 0;
-
-        for i in 0..POLYNOMIAL_SIZE {
-
-            for b in 0..nb_bits {
-                if (self.c[i] & (1 << b)) != 0 {
-                    ret[bit_index/8] |= 1 << (bit_index % 8);
-                }
-
-                bit_index += 1;
-            }
+        for i in 0..VECTOR_SIZE {
+           ret.extend_from_slice(&self.c[i].to_le_bytes()[0..2]);
         }
 
         ret
-
     }
-
 
 }
 
@@ -210,17 +196,27 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
     }
 
-   pub fn encode(&self,nb_bits : usize)->Vec<u8>{
-    // encode each polynomial coefficients on 12 bits
-        let mut ret : Vec<u8> = Vec::new();
+   pub fn encode(&self,nb_bits : u8)->Vec<u8>{
+
+        let mut ret : Vec<u8>;
         for i in 0..k{
-            ret.extend(self.c[i].encode(nb_bits));
+            ret.extend_from_slice(self.c[i].encode(nb_bits));
+        }
+        ret
+
+
+   }
+
+    pub fn get_bytes_compressed(&self)->Vec<u8>{
+        let mut ret : Vec<u8> = Vec::new();
+
+        for i in 0..VECTOR_SIZE {
+            // each coefficient must fit in 4 bits
+            ret.extend_from_slice(&self.c[i].get_bytes()[0..4]);
         }
 
         ret
-   }
-
-
+    }
 
 
 
@@ -349,7 +345,7 @@ impl <const RN : usize, const CN : usize> PolyMatrix<{RN},{CN}>{
         }    
     }
 
-    pub fn set_coef(&mut self, row_index : usize, col_index : usize, v : Vector<POLYNOMIAL_SIZE>){
+    pub fn set_coef(&mut self, col_index : usize, row_index : usize, v : Vector<POLYNOMIAL_SIZE>){
         self.row_vecs[row_index].set(col_index,v);
 
         self.col_vecs[col_index].set(row_index,v);

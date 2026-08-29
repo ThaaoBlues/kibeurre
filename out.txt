@@ -1,0 +1,17 @@
+          0      context-switches:u               #      0,0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0,0 migrations/sec  migrations_per_second
+               116      page-faults:u                    #  81481,8 faults/sec  page_faults_per_second
+              1,42 msec task-clock:u                     #      0,1 CPUs  CPUs_utilized       
+             6 975      branch-misses:u                  #      7,8 %  branch_miss_rate         (15,61%)
+           683 820      branches:u                       #    480,3 M/sec  branch_frequency     (85,09%)
+         3 754 808      cpu-cycles:u                     #      2,6 GHz  cycles_frequency     
+         7 663 536      instructions:u                   #      2,0 instructions  insn_per_cycle
+           763 485      stalled-cycles-frontend:u        #     0,18 frontend_cycles_idle        (84,39%)
+
+       0,001914125 seconds time elapsed
+
+       0,001903000 seconds user
+       0,000000000 seconds sys
+
+
+       ==========

@@ -5,20 +5,18 @@ use crate::math_utils::square_and_mult;
 // zeta powers arranged in bit-reversed order
 // /!\ in the kyber reference C code, the array contains the values directly in Montgomery domain
 // Here, we store the values in normal representation, and convert to Montgomery form when needed
-const ZETA_TABLE : [i32;128] = [1, 3328, 1729, 1600, 2580, 749, 3289, 40, 2642, 687, 630, 2699, 1897, 1432, 848, 2481, 1062, 2267, 1919, 1410, 193, 3136, 797, 2532, 2786, 543, 3260, 69, 569, 2760, 1746, 1583, 296, 3033, 2447, 882, 1339, 1990, 1476, 1853, 3046, 283, 56, 3273, 2240, 1089, 1333, 1996, 1426, 1903, 2094, 1235, 535, 2794, 2882, 447, 2393, 936, 2879, 450, 1974, 1355, 821, 2508, 289, 3040, 331, 2998, 3253, 76, 1756, 1573, 1197, 2132, 2304, 1025, 2277, 1052, 2055, 1274, 650, 2679, 1977, 1352, 2513, 816, 632, 2697, 2865, 464, 33, 3296, 1320, 2009, 1915, 1414, 2319, 1010, 1435, 1894, 807, 2522, 452, 2877, 1438, 1891, 2868, 461, 1534, 1795, 2402, 927, 2647, 682, 2617, 712, 1481, 1848, 648, 2681, 2474, 855, 3110, 219, 1227, 2102, 910, 2419];
+const ZETA_TABLE : [i32;128] = [1, 1729, 2580, 3289, 2642, 630, 1897, 848, 1062, 1919, 193, 797, 2786, 3260, 569, 1746, 296, 2447, 1339, 1476, 3046, 56, 2240, 1333, 1426, 2094, 535, 2882, 2393, 2879, 1974, 821, 289, 331, 3253, 1756, 1197, 2304, 2277, 2055, 650, 1977, 2513, 632, 2865, 33, 1320, 1915, 2319, 1435, 807, 452, 1438, 2868, 1534, 2402, 2647, 2617, 1481, 648, 2474, 3110, 1227, 910, 17, 2761, 583, 2649, 1637, 723, 2288, 1100, 1409, 2662, 3281, 233, 756, 2156, 3015, 3050, 1703, 1651, 2789, 1789, 1847, 952, 1461, 2687, 939, 2308, 2437, 2388, 733, 2337, 268, 641, 1584, 2298, 2037, 3220, 375, 2549, 2090, 1645, 1063, 319, 2773, 757, 2099, 561, 2466, 2594, 2804, 1092, 403, 1026, 1143, 2150, 2775, 886, 1722, 1212, 1874, 1029, 2110, 2935, 885, 2154];
 
-
-const ZETA_INV_TABLE : [i32;128] = [1, 3328, 1600, 1729, 40, 3289, 749, 2580, 2481, 848, 1432, 1897, 2699, 630, 687, 2642, 1583, 1746, 2760, 569, 69, 3260, 543, 2786, 2532, 797, 3136, 193, 1410, 1919, 2267, 1062, 2508, 821, 1355, 1974, 450, 2879, 936, 2393, 447, 2882, 2794, 535, 1235, 2094, 1903, 1426, 1996, 1333, 1089, 2240, 3273, 56, 283, 3046, 1853, 1476, 1990, 1339, 882, 2447, 3033, 296, 2419, 910, 2102, 1227, 219, 3110, 855, 2474, 2681, 648, 1848, 1481, 712, 2617, 682, 2647, 927, 2402, 1795, 1534, 461, 2868, 1891, 1438, 2877, 452, 2522, 807, 1894, 1435, 1010, 2319, 1414, 1915, 2009, 1320, 3296, 33, 464, 2865, 2697, 632, 816, 2513, 1352, 1977, 2679, 650, 1274, 2055, 1052, 2277, 1025, 2304, 2132, 1197, 1573, 1756, 76, 3253, 2998, 331, 3040, 289];
+const ZETA_INV_TABLE : [i32;128] = [1, 1600, 40, 749, 2481, 1432, 2699, 687, 1583, 2760, 69, 543, 2532, 3136, 1410, 2267, 2508, 1355, 450, 936, 447, 2794, 1235, 1903, 1996, 1089, 3273, 283, 1853, 1990, 882, 3033, 2419, 2102, 219, 855, 2681, 1848, 712, 682, 927, 1795, 461, 1891, 2877, 2522, 1894,1010, 1414, 2009, 3296, 464, 2697, 816, 1352, 2679, 1274, 1052, 1025, 2132, 1573, 76, 2998, 3040, 1175, 2444, 394, 1219, 2300, 1455, 2117,1607, 2443, 554, 1179, 2186, 2303, 2926, 2237, 525, 735, 863, 2768, 1230, 2572, 556, 3010, 2266, 1684, 1239, 780, 2954, 109, 1292, 1031, 1745, 2688, 3061, 992, 2596, 941, 892, 1021, 2390, 642, 1868, 2377, 1482, 1540, 540, 1678, 1626, 279, 314, 1173, 2573, 3096, 48, 667, 1920, 2229, 1041, 2606, 1692, 680, 2746, 568, 3312];
 const ZETA_0 : i32= 17;
 const ZETA_INV_0  : i32 = 1175;
+
 
 // Kyber style NTT, stops at degree 1 to use nth unity root
 // returns 128 polynomials => vector still size 256 
 pub fn ntt(p : Vector<256>) -> Vector<256>{
     
         
-
-
 
     // built Montgomery rpz of the vector
 
@@ -45,6 +43,7 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
             // perform symetric calculations on j and j+n/2
             // make use (probably unwise) of Montgomery reduction
             for i in chunk..(chunk+n_sur_2){
+
                 let b : i32 =  mtg_p[i+n_sur_2].mult(ZETA_TABLE[k]).get_a();
 
                 let a : i32 = mtg_p[i].get_a();
@@ -111,7 +110,7 @@ pub fn intt(p : Vector<256>)->Vector<256>{
     }
 
 
-
+    //let mut k = 127;
     for n_sur_2 in [2,4,8,16,32,64,128]{
 
 
@@ -123,7 +122,6 @@ pub fn intt(p : Vector<256>)->Vector<256>{
         // we cannot start from 0 and increment as we did during ntt
         // as in reverse, k starting value is not linear
         let mut k: usize = 256/(2*n_sur_2) - 1;
-
 
         // get 2 chunks of length n/2
         for chunk in (0..256).step_by(2*n_sur_2){
@@ -158,8 +156,10 @@ pub fn intt(p : Vector<256>)->Vector<256>{
                 mtg_p[i+n_sur_2] = mtg_p[i+n_sur_2].mult(ZETA_INV_TABLE[k])
 
             }
+
             
         }
+
     }
 
 
@@ -179,15 +179,9 @@ pub fn intt(p : Vector<256>)->Vector<256>{
 
 /*
 Uses NTT to quickly compute the product of two degree 256 polynomials 
+ASSUME BOTH A AND B ARE ALREADY IN NTT FORM
 */
-pub fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
-
-
-    
-
-    let ntt_a = ntt(a);
-    let ntt_b = ntt(b);
-
+pub fn poly_mult(ntt_a : Vector<256>, ntt_b : Vector<256>)->Vector<256>{
 
 
     let mut ntt_c: Vector<256> = Vector::new(&[0;256], 3329);
@@ -211,7 +205,7 @@ pub fn poly_mult(a : Vector<256>, b : Vector<256>)->Vector<256>{
         i += 2;
     }
 
-    intt(ntt_c)
+    ntt_c
 }
 
 
@@ -221,7 +215,7 @@ pub fn compute_zeta_table() -> [i32;128]{
     let mut z : [i32;128] = [0;128];
     for i in 0..128u8{
 
-        let i_r = i.reverse_bits();
+        let i_r = i.reverse_bits() >> 1; // /!\ we only need 7 bits to compute powers of 17, as 17^128 = 1 mod 3329
 
         let res = square_and_mult(ZETA_0 as u32, i_r as u32, 3329) as i32;
         //println!("17^{i_r}%3329 = {res}");
@@ -229,8 +223,6 @@ pub fn compute_zeta_table() -> [i32;128]{
     
 
     }
-
-    println!("{:?}",z);
 
     z
 }
@@ -241,7 +233,8 @@ pub fn compute_inv_zeta_table() -> [i32;128]{
     let mut z : [i32;128] = [0;128];
     for i in 0..128u8{
 
-        let i_r = i.reverse_bits();
+        // /!\ we only need 7 bits to compute powers of 17, as 17^128 = 1 mod 3329
+        let i_r = i.reverse_bits() >> 1;
 
         let res = square_and_mult(ZETA_INV_0 as u32, i_r as u32, 3329) as i32;
         println!("17^-{i_r}%3329 = {res}");
@@ -249,8 +242,6 @@ pub fn compute_inv_zeta_table() -> [i32;128]{
     
 
     }
-
-    println!("{:?}",z);
 
     z
 }
@@ -262,29 +253,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ntt_intt_roundtrip() {
-        // Create a simple polynomial: f(x) = 1 + 2x + 3x^2 + ...
-        let mut coefficients = [0; 256];
-        for (i, coeff) in coefficients.iter_mut().enumerate() {
-            *coeff = i as i32;
-        }
-        let p = Vector::new(&coefficients, 3329);
-
-        // Perform NTT then iNTT
-        let ntt_p = ntt(p);
-        let back_p = intt(ntt_p);
-        println!("BACK_P = {:?}",back_p);
-
-        // Check if we got the original back
-        for (i,coef) in coefficients.iter().enumerate() {
-            assert_eq!(
-                back_p.c[i], 
-                *coef, 
-                "Roundtrip failed at index {}. Expected {}, got {}", 
-                i, *coef, back_p.c[i]
-            );
-        }
+    fn print_zeta_tables() {
+        let zeta_table = compute_zeta_table();
+        let zeta_inv_table = compute_inv_zeta_table();  
+        println!("ZETA_TABLE: {:?}", zeta_table);
+        println!("ZETA_INV_TABLE: {:?}", zeta_inv_table);
     }
+
 
     #[test]
     fn test_ntt_constant_one() {
@@ -338,5 +313,47 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_ntt_intt_random_polynomials() {
+        // Deterministic PRNG so failures are reproducible.
+        // We don't need a cryptographic RNG for a correctness test.
+        let mut seed: u64 = 0x1234_5678_9ABC_DEF0;
+
+        fn next_random(seed: &mut u64) -> i32 {
+            // xorshift64*
+            *seed ^= *seed << 13;
+            *seed ^= *seed >> 7;
+            *seed ^= *seed << 17;
+
+            (*seed % 3329) as i32
+        }
+
+        const NB_TESTS: usize = 100;
+
+        for test_number in 0..NB_TESTS {
+            let mut coefficients = [0i32; 256];
+
+            for coefficient in coefficients.iter_mut() {
+                *coefficient = next_random(&mut seed);
+            }
+
+            let p = Vector::new(&coefficients, 3329);
+
+            let ntt_p = ntt(p);
+            let back_p = intt(ntt_p);
+
+            for i in 0..256 {
+                assert_eq!(
+                    back_p.c[i],
+                    coefficients[i],
+                    "NTT/INTT roundtrip failed: test {}, coefficient {}, expected {}, got {}",
+                    test_number,
+                    i,
+                    coefficients[i],
+                    back_p.c[i]
+                );
+            }
+        }
+}
 
 }
