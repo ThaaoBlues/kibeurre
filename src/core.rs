@@ -218,7 +218,6 @@ fn decompress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
 
 fn round(v : Vector<n>) -> Vector<n>{
 
-
     /*
     Map all values on the south emisphere of the circle mods q to 1
     And all the north emisphere to 0
@@ -264,15 +263,14 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8
     let mut r_ntt : PolyVector<k>;
     (r_ntt,nonce) = generate_noise_polyvector(ETA_1,nonce,&r);
     r_ntt.c = r_ntt.c.map(ntt::ntt);
-    let mut e1 : PolyVector<k>;
+    let mut e1 : PolyVector<k>; 
     (e1,nonce) = generate_noise_polyvector(ETA_2,nonce,&r);
-    let mut e2 : Vector<256>;
+    let mut e2 : Vector<256>; 
     (e2,nonce) = generate_noise_vector(ETA_2,nonce,&r);
 
 
-
     //println!("r_ntt = {:?}",r_ntt);
-    let mut v : Vector<n> = t.ntt_dot(r_ntt);
+    let mut v : Vector<n> = t.ntt_dot(r_ntt);                                // CHECK FUNCTION
     //println!("t after ntt dot with rntt : \n {:?}",v);
 
     v = ntt::intt(v);
@@ -284,7 +282,7 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8
 
 
     // u := NTT−1(AT◦r) + e1 
-    let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r_ntt);
+    let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r_ntt);               // CHECK FUNCTION
 
     //println!("u before ntt : {:?}",u);
 
@@ -292,9 +290,8 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8
     u.add(e1);
 
 
-    // u and v are returned in their NTT form !
-    EncryptedMessage { u:compress_polyvector(u,D_U), v:compress(v,D_V) }
-    //return EncryptedMessage { u, v };
+    // u and v returned in the normal domain
+    EncryptedMessage { u:compress_polyvector(u,D_U), v:compress(v,D_V) }     // CHECK COMPRESSION ???
 
 }
 
@@ -617,6 +614,8 @@ use super::*;
         
         
         let encrypted_message = encrypt(A, t, msg,r);
+
+        // at this stage, u and v are compressed 
 
 
         //println!("Encrypted message: u = {:?}, v = {:?}", encrypted_message.u, encrypted_message.v);
