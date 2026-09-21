@@ -1,5 +1,5 @@
 use crate::math_utils::{Vector,empty_vector,PolyVector,empty_polyvector};
-use crate::parameters::{n,k};
+use crate::parameters::{N,k};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -8,12 +8,13 @@ Converts a string into a vector of Vector<n> where each Vector<n> represents a c
 The string is split into bytes chunks of size n.
 So each vector actually contains n bytes of the string.
 */
-pub fn string_to_vectors(input: &str) -> Vec<Vector<n>> {
+pub fn string_to_vectors(input: &str) -> Vec<Vector<N>> {
     let bytes = input.as_bytes();
     let mut vectors = Vec::new();
 
 
-    for chunk in bytes.chunks(n/8) {
+
+    for chunk in bytes.chunks(N/8) {
         let mut vector = empty_vector(); // filled with zeros, will be used as padding
         for (i, &byte) in chunk.iter().enumerate() {
 
@@ -32,11 +33,11 @@ pub fn string_to_vectors(input: &str) -> Vec<Vector<n>> {
 
 
 
-pub fn vectors_to_string(vectors: Vec<Vector<n>>) -> String {
+pub fn vectors_to_string(vectors: Vec<Vector<N>>) -> String {
     let mut bytes = Vec::new();
     for vector in vectors {
 
-        for i in 0..(n/8) {
+        for i in 0..(N/8) {
             let mut byte = 0;
         
             
@@ -254,7 +255,7 @@ pub fn parse_public_key(string : &str)->(Vec<u8>,PolyVector<k>){
     (seed,t)
 }
 
-pub fn parse_cyphertext(string : &str)->(PolyVector<k>, Vector<n>){
+pub fn parse_cyphertext(string : &str)->(PolyVector<k>, Vector<N>){
     // parse u then v, both are represented as hex strings
     let u = parse_compressed_polyvector(string.trim().chars().take(k*256*10/4).collect::<String>().as_str());
     let v = parse_compressed_vector(string.trim().chars().skip(k*256*10/4).collect::<String>().as_str());
@@ -303,7 +304,7 @@ pub struct KyberTestCase {
     pub z : Vec<u8>,
     pub rng_seed: Vec<u8>,
     // u,v 
-    pub ct: (PolyVector<k>, Vector<n>),
+    pub ct: (PolyVector<k>, Vector<N>),
     // derived key from m
     pub ss: Vec<u8>,
 }

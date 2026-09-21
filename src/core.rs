@@ -1,11 +1,10 @@
-use std::env::remove_var;
 
 use crate::math_utils::{PolyMatrix,PolyVector,Vector,empty_polymatrix,empty_polyvector,empty_vector};
 
 use crate::ntt;
 use rand::{Rng, random};
 use shake::{ExtendableOutput, Update, XofReader,Shake256};
-use crate::parameters::{D_U, D_V, ETA_1, ETA_2, k, n, q};
+use crate::parameters::{D_U, D_V, ETA_1, ETA_2, k, N, Q};
 use crate::format_utils::{parse_polyvector_bytes, string_to_vectors, vectors_to_string};
 use nist_pqc_seeded_rng::{NistPqcAes256CtrRng, Seed, SeedableRng};
 use sha3::{Digest, Sha3_256,Sha3_512};
@@ -59,7 +58,7 @@ pub fn generate_A_from_seed(seed : &Vec<u8>) -> PolyMatrix<k,k>{
     
     //let mut A : PolyMatrix<k,k> = empty_polymatrix();
     let mut A_ntt : PolyMatrix<k,k> = empty_polymatrix();
-    let mut generated_polynomial : Vector<n> = empty_vector();
+    let mut generated_polynomial : Vector<N> = empty_vector();
 
 
     for i in 0..k {
@@ -81,7 +80,7 @@ pub fn generate_A_from_seed(seed : &Vec<u8>) -> PolyMatrix<k,k>{
 
             // Kyber assume reading LSB-FIRST
             let mut l : usize = 0;
-            while l < n {
+            while l < N {
 
                 reader.read(&mut buf);
 
@@ -90,19 +89,20 @@ pub fn generate_A_from_seed(seed : &Vec<u8>) -> PolyMatrix<k,k>{
                 
 
                 // rejection sampling
-                if c1 < q {
+                if c1 < Q {
                    generated_polynomial.c[l] = c1;
                    l += 1;
                 }
 
-                if c2 < q && l < n {
+                if c2 < Q && l < N {
                     generated_polynomial.c[l] = c2;
                     l += 1;
                 }                
             }
-            
-            //A.set_coef(i,j,generated_polynomial);
-            A_ntt.set_coef(i, j, ntt::ntt(generated_polynomial));
+
+            // no need to ntt the polynomial as the distribution would be the same in the NTT domain,
+            // we can consider its output as NTT domain values
+            A_ntt.set_coef(i, j, generated_polynomial);
         }
 
         
@@ -114,7 +114,8 @@ pub fn generate_A_from_seed(seed : &Vec<u8>) -> PolyMatrix<k,k>{
 }
 
 
-fn generate_noise_vector(eta : i16,nonce : u8,sigma_or_r : &Vec<u8>) -> (Vector<n>, u8){
+
+pub fn generate_noise_vector(eta : i16,nonce : u8,sigma_or_r : &Vec<u8>) -> (Vector<N>, u8){
 
     /*
     noise vectors are considered "small" vectors,
@@ -124,12 +125,15 @@ fn generate_noise_vector(eta : i16,nonce : u8,sigma_or_r : &Vec<u8>) -> (Vector<
 
     // wrapping mul as it should never be in a case where any overflow could happen anyway.
     // eta*64 bytes = 2*eta*256 bits
-    let random_bytes = PRF(&sigma_or_r,nonce,eta.wrapping_mul(64) as usize);
+    let random_bytes = PRF(sigma_or_r,nonce,eta.wrapping_mul(64) as usize);
 
-    let mut random_vector : Vector<n> = empty_vector();
-    for i in 0..n {
-        let sample = cbd_sample_from_bits(&random_bytes,eta as usize,i);
-        random_vector.set(i, sample as i32);
+    let mut random_vector : Vector<N> = empty_vector();
+    for i in 0..N {
+        let mut sample = cbd_sample_from_bits(&random_bytes,eta as usize,i);
+
+        // in kyber, the noise is then directly reduced modulo Q to map to [0;Q]
+        sample = sample.rem_euclid(Q);
+        random_vector.set(i, sample);
     }
     (random_vector, nonce + 1)
 }
@@ -138,7 +142,7 @@ fn generate_noise_vector(eta : i16,nonce : u8,sigma_or_r : &Vec<u8>) -> (Vector<
 pub fn generate_noise_polyvector(eta : i16,mut nonce : u8,sigma_or_r : &Vec<u8>) -> (PolyVector<k>, u8){
 
     let mut random_polyvector : PolyVector<k> = empty_polyvector();
-    let mut coef : Vector<n>;
+    let mut coef : Vector<N>;
     for i in 0..k {
         (coef, nonce) = generate_noise_vector(eta,nonce,sigma_or_r);
         random_polyvector.set(i, coef);
@@ -157,7 +161,10 @@ pub fn compute_t(mut A : PolyMatrix<k,k>, s : PolyVector<k>, mut e : PolyVector<
 
     // as e is not in NTT domain
     e.c = e.c.map(ntt::ntt);
+    //t.c = t.c.map(ntt::intt);
     t.add(e);
+
+    //t.c = t.c.map(ntt::ntt);
 
     t
 }
@@ -165,12 +172,13 @@ pub fn compute_t(mut A : PolyMatrix<k,k>, s : PolyVector<k>, mut e : PolyVector<
 
 
 
-fn compress(mut u : Vector<n>, d : i32) -> Vector<n>{
+
+pub fn compress(mut u : Vector<N>, d : i32) -> Vector<N>{
     
     for i in 0..u.c.len() {
-        // Rust uses truncature for integer division, so we add q/2 to round to the next integer instead of flooring
-        //println!("compression coefficient : {:?}",((u.c[i]*(1 << d)+q/2)/q) % (1 << d));
-        u.c[i] = ((u.c[i]*(1 << d)+q/2)/q) % (1 << d);
+        // Rust uses truncature for integer division, so we add Q/2 to round to the next integer instead of flooring
+        //println!("compression coefficient : {:?}",((u.c[i]*(1 << d)+Q/2)/Q) % (1 << d));
+        u.c[i] = ((u.c[i]*(1 << d)+Q/2)/Q) % (1 << d);
 
         // positive symetrical modulus
         if u.c[i] < 0 {
@@ -195,12 +203,11 @@ fn compress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
     u
 
 }
-
-fn decompress(mut u : Vector<n>, d : i32) -> Vector<n>{
+pub fn decompress(mut u : Vector<N>, d : i32) -> Vector<N>{
 
     for i in 0..u.c.len() {
-        // Rust uses truncature for integer division, so we add q/2 to round to the next integer instead of flooring
-        u.c[i] = (u.c[i] * q + (1 << (d - 1))) / (1 << d);    }
+        // Rust uses truncature for integer division, so we add Q/2 to round to the next integer instead of flooring
+        u.c[i] = (u.c[i] * Q + (1 << (d - 1))) / (1 << d);    }
 
     u
 
@@ -215,21 +222,20 @@ fn decompress_polyvector(mut u : PolyVector<k>, d : i32) -> PolyVector<k>{
     u
 }
 
-
-fn round(v : Vector<n>) -> Vector<n>{
+fn round(v : Vector<N>) -> Vector<N>{
 
     /*
-    Map all values on the south emisphere of the circle mods q to 1
+    Map all values on the south emisphere of the circle mods Q to 1
     And all the north emisphere to 0
      */
 
 
     let mut r = empty_vector();
-    for i in 0..n {
+    for i in 0..N {
 
         let val = v.c[i];
 
-        if val > q/4 && val < 3*q/4  {
+        if val > Q/4 && val < 3*Q/4  {
             r.set(i,1);
 
         }else{
@@ -248,12 +254,12 @@ fn round(v : Vector<n>) -> Vector<n>{
 pub struct EncryptedMessage{
     // u and v are returned in their NTT form from the encrypt function
     pub u : PolyVector<k>,
-    pub v : Vector<n>
+    pub v : Vector<N>
 }
 
 
 #[allow(non_snake_case)]
-pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8>) -> EncryptedMessage{
+pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<N>,r : Vec<u8>) -> EncryptedMessage{
 
 
     // v = t^T.r + e_2 + round(q/2)*m
@@ -265,19 +271,19 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8
     r_ntt.c = r_ntt.c.map(ntt::ntt);
     let mut e1 : PolyVector<k>; 
     (e1,nonce) = generate_noise_polyvector(ETA_2,nonce,&r);
-    let mut e2 : Vector<256>; 
+    let mut e2 : Vector<N>; 
     (e2,nonce) = generate_noise_vector(ETA_2,nonce,&r);
 
 
     //println!("r_ntt = {:?}",r_ntt);
-    let mut v : Vector<n> = t.ntt_dot(r_ntt);                                // CHECK FUNCTION
+    let mut v : Vector<N> = t.ntt_dot(r_ntt);                                // CHECK FUNCTION
     //println!("t after ntt dot with rntt : \n {:?}",v);
 
     v = ntt::intt(v);
     v.add(e2);
 
     let mut tmp = msg;
-    tmp.scalar_mult((q+1)/2); // kyber use round to next int division, thus the +1
+    tmp.scalar_mult((Q+1)/2); // kyber use round to next int division, thus the +1
     v.add(tmp);
 
 
@@ -295,10 +301,11 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<n>,r : Vec<u8
 
 }
 
-pub fn decrypt(EncryptedMessage { u, v }: & EncryptedMessage, s : PolyVector<k>) -> Vector<n>{
-    // assume u, v are compressed NORMAL-domain values; s is NTT-domain    
+pub fn decrypt(EncryptedMessage { u, v }: & EncryptedMessage, s : PolyVector<k>) -> Vector<N>{
+    // assume u is NORMAL-domain 
     
     // m = round(v - s^T.u)
+    let mut s_copy = s.clone(); // do not modify s, as it could be used for multiple decryption operations
 
     let mut u_decompressed = decompress_polyvector(*u,D_U);
     let mut v_decompressed = decompress(*v,D_V);
@@ -307,14 +314,15 @@ pub fn decrypt(EncryptedMessage { u, v }: & EncryptedMessage, s : PolyVector<k>)
     //v.sub(s_copy.ntt_dot(*u));
     //return round(*v);
     u_decompressed.c = u_decompressed.c.map(ntt::ntt);
-    v_decompressed.sub(    ntt::intt(s.ntt_dot(u_decompressed)));
-
+    v_decompressed = ntt::ntt(v_decompressed);
+    s_copy.c = s_copy.c.map(ntt::ntt);
+    v_decompressed.sub(    s_copy.ntt_dot(u_decompressed));
+    v_decompressed = ntt::intt(v_decompressed);
     round(v_decompressed)
-
 }
 
 
-fn hash_public_key(pk: &PublicKey) -> Vec<u8> {
+pub fn hash_public_key(pk: &PublicKey) -> Vec<u8> {
     let mut bytes = pk.t.encode(12); // 12 bits/coeff packing, same layout as parse_polyvector expects
     bytes.extend_from_slice(&pk.rho);
     Sha3_256::digest(&bytes).to_vec()
@@ -347,7 +355,7 @@ pub fn decapsulate(c : EncryptedMessage, PrivateKey { s, pk, hashed_pk, z }: Pri
 
     // m = round(v - s^T.u)
 
-    let msg = decrypt(&c, s);
+    let msg = decrypt(&c, s); // verif si ça fonctionne 
 
     // G(m || H(pk))
     let mut G = sha3::Sha3_512::new();
@@ -373,7 +381,7 @@ pub fn decapsulate(c : EncryptedMessage, PrivateKey { s, pk, hashed_pk, z }: Pri
     KDF(K_b, hash_c(c))
 }
 
-fn encapsulate(pk: &PublicKey, msg : Vector<n>) -> (EncryptedMessage, Vec<u8>){
+pub fn encapsulate(pk: &PublicKey, msg : Vector<N>) -> (EncryptedMessage, Vec<u8>){
 
     let hashed_pk = hash_public_key(pk);
     let msg_bytes: Vec<u8> = msg.encode(1);
@@ -486,10 +494,10 @@ pub fn generate_d_and_z(rng : &mut NistPqcAes256CtrRng)->(Vec<u8>,Vec<u8>){
 
 }
 
-pub fn generate_message_from_seed(rng : &mut NistPqcAes256CtrRng)->(Vector<n>, Vec<u8>){
+pub fn generate_message_from_seed(rng : &mut NistPqcAes256CtrRng)->(Vector<N>, Vec<u8>){
 
     let mut b_msg : [u8; 32] = [0; 32];
-    let mut msg_vector : Vector<n> = empty_vector();
+    let mut msg_vector : Vector<N> = empty_vector();
     rng.fill_bytes(b_msg.as_mut_slice());
 
     for(i,byte) in b_msg.iter_mut().enumerate() {
@@ -530,192 +538,6 @@ pub fn PRF(sigma_or_r : &Vec<u8>, nonce : u8, output_len : usize) -> Vec<u8> {
     let mut hash = vec![0u8; output_len];
     reader.read(&mut hash);
     hash.to_vec()
-}
-
-
-
-
-#[cfg(test)]
-mod tests {
-    use hex::ToHex;
-
-use super::*;
-
-    #[test]
-    fn test_generate_seed_vector() {
-        let seed_vector = generate_seed_vector();
-        println!("Seed vector: {:?}", seed_vector);
-    }
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_generate_A_from_seed() {
-        let seed_vector = generate_seed_vector();
-        let A = generate_A_from_seed(&seed_vector);
-        println!("A: {:?}", A);
-    
-    }
-
-    #[test]
-    fn test_compute_t() {
-
-        let mut nonce = 0;
-        let sigma = Vec::new();
-        let seed_vector = generate_seed_vector();
-        #[allow(non_snake_case)]
-        let A = generate_A_from_seed(&seed_vector);
-        let s : PolyVector<k>;
-        (s, nonce) = generate_noise_polyvector(ETA_1, nonce, &sigma);
-        let e : PolyVector<k>;
-        (e, _) = generate_noise_polyvector(ETA_2, nonce, &sigma);
-        let t = compute_t(A, s, e);
-        println!("t: {:?}", t);
-    }
-
-    #[test]
-    fn test_compress_decompress() {
-        let noise_vector = generate_noise_vector(ETA_1,0,&(0..32).collect()).0;
-        let compressed = compress(noise_vector, D_U);
-        let decompressed = decompress(compressed, D_U);
-        println!("Original: {:?}", noise_vector);
-        println!("Compressed: {:?}", compressed);
-        println!("Decompressed: {:?}", decompressed);
-
-    }
-
-
-
-    #[test]
-    fn test_encrypt_decrypt() {
-        #[allow(non_snake_case)]
-        let mut rng = NistPqcAes256CtrRng::from_seed([3u8; 48].into());
-        let d = generate_d_and_z(&mut rng).0;
-        let (rho,sigma) = generate_rho_and_sigma(d);
-        let A = generate_A_from_seed(&rho); // generated in ntt form
-
-        let mut nonce = 0;
-        let mut s : PolyVector<k>;
-        (s, nonce) = generate_noise_polyvector(ETA_1, nonce, &sigma);
-        s.c = s.c.map(ntt::ntt);
-        let e : PolyVector<k>;
-        (e, nonce) = generate_noise_polyvector(ETA_2, nonce, &sigma);
-        
-        
-        let t = compute_t(A, s, e);
-
-        let hashed_pk = hash_public_key(&PublicKey { A, t, rho });
-
-
-
-        let msg = Vector::new(&[1; 256],q); // using seed vector as a message for testing
-
-
-        let (kb,r) = derive_coins(msg.encode(1), hashed_pk);
-        
-        
-        let encrypted_message = encrypt(A, t, msg,r);
-
-        // at this stage, u and v are compressed 
-
-
-        //println!("Encrypted message: u = {:?}, v = {:?}", encrypted_message.u, encrypted_message.v);
-        let decrypted_msg = decrypt(&encrypted_message, s);
-
-        assert_eq!(msg.c, decrypted_msg.c,"decryption failed");
-    }
-
-
-
-
-    use crate::format_utils::{KyberTestCase,parse_kyber_test_vectors};
-
-    #[test]
-    fn kat_test_hash_pk(){
-        let test_cases : Vec<KyberTestCase> = parse_kyber_test_vectors();
-        for tc in test_cases {
-            println!("Running test case: {}", tc.count);
-
-            let A  = generate_A_from_seed(&tc.rho);
-            let pub_key = PublicKey { A, t: tc.t, rho: tc.rho };
-            let h_pk = hash_public_key(&pub_key);
-            assert_eq!(tc.pk_hash, h_pk,"hashes are not equal");
-        }
-    }
-
-    #[test]
-    fn kat_test_z_generation(){
-        let test_cases : Vec<KyberTestCase> = parse_kyber_test_vectors();
-        for tc in test_cases {
-            println!("Running test case: {}", tc.count);
-
-            let mut rng = NistPqcAes256CtrRng::from_seed(tc.rng_seed[..48].try_into().unwrap());
-            let z = generate_d_and_z(&mut rng).1;
-            assert_eq!(tc.z, z,"z values are not equal");
-        }
-    }
-
-
-    #[test]
-    fn kat_test_decapsulation(){
-
-        let test_cases : Vec<KyberTestCase> = parse_kyber_test_vectors();
-        for tc in test_cases {
-            //println!("Running test case: {:?}", tc);
-
-            let A  = generate_A_from_seed(&tc.rho);
-
-            let mut encrypted_message = EncryptedMessage { u: tc.ct.0, v: tc.ct.1 };
-            let pub_key = PublicKey { A, t: tc.t, rho: tc.rho };
-            let mut rng = NistPqcAes256CtrRng::from_seed(tc.rng_seed[..48].try_into().unwrap());
-            let z = generate_d_and_z(&mut rng).1;
-
-
-            //good up until here
-            // hash_public_key is correct
-            let K = decapsulate( encrypted_message, 
-                PrivateKey { s: tc.sk,
-                    pk: pub_key.clone(),
-                    hashed_pk: hash_public_key(&pub_key),
-                    z
-                }
-            );
-            assert_eq!(tc.ss, K,"decryption failed");
-        }
-    }
-    
-    #[test]
-    fn run_enc_dec_test_on_known_vectors(){
-
-        let test_cases = parse_kyber_test_vectors();
-        for tc in test_cases {
-            //println!("Running test case: {:?}", tc);
-            println!("============= TESTING ENCAPSULATION ==============");
-
-            let A  = generate_A_from_seed(&tc.rho);
-            let pk = PublicKey { A, t: tc.t, rho: tc.rho };
-            let mut rng = NistPqcAes256CtrRng::from_seed(tc.rng_seed[..48].try_into().unwrap());
-            let (msg, msg_bytes) = generate_message_from_seed(&mut rng);
-            let (encrypted_message, K) = encapsulate(&pk, msg);
-
-            println!("{:x?}",tc.ct.0.encode(D_U as usize));
-
-            assert_eq!(encrypted_message.u, tc.ct.0, "encryption failed for u");
-            assert_eq!(encrypted_message.v, tc.ct.1, "encryption failed for v");
-
-            println!("============= TESTING DECAPSULATION ==============");
-            let ref_enc_msg = EncryptedMessage { u: tc.ct.0, v: tc.ct.1 };
-            let K = decapsulate(ref_enc_msg, 
-                PrivateKey { s: tc.sk,
-                    pk: pk.clone(),
-                    hashed_pk: hash_public_key(&pk),
-                    z: generate_d_and_z(&mut rng).1
-                }
-            );
-            assert_eq!(tc.ss, K,"decryption failed");
-        }
-
-
-    }
 }
 
 

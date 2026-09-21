@@ -3,3 +3,4 @@ pub mod ntt;
 pub mod core;
 pub mod parameters;
 pub mod format_utils;
+pub mod core_tests;

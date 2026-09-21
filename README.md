@@ -6,8 +6,9 @@ To try it, just `git clone https://github.com/thaaoblues/kibeurre.git` and `cd k
 
 
 ## TOUDOU 
-- faire en sorte que tout soit NTT dans les calculs
-- ensuite, modifier pour coller à la description qui prend u dans sa forme non NTT ? ou pas
+- voir si c'est la forme de s ou le nonce qui fait fail le test de génération de t
+- voir pourquoi la decryption foire
+- 
 - montgomery multiplication is false ? Not giving the same result as classic one
 - faire les tests sur les vecteurs de tests officiels
 - clean the code
@@ -196,7 +197,7 @@ Layout: **`s ‖ pk ‖ H(pk) ‖ z`**  (i.e. `s ‖ t ‖ rho ‖ H(pk) ‖ z`)
 | `z`      | 32   | 64   | fixed |
 | **total sk** | **2400** | **4800** | `2*(k*384) + 96` |
 
-`s` and `t` are (as previous appearance of `t` in `pk`) represented in the **NTT domain**  
+`s` and `t` are (as previous appearance of `t` in `pk`) represented in the **NTT domain ???**  
 
 ---
 
@@ -211,7 +212,7 @@ Layout: **`u ‖ v`** (both **compressed**)
 | **total ct** | **1088** | **2176** | `k*320 + 128` |
 
 - `u` = compressed `NTT⁻¹(Aᵀ∘r) + e1`, 10 bits/coeff, `k` polynomials.
-- `v` = compressed `tᵀ·r + e2 + ⌈q/2⌋·m`, 4 bits/coeff, single polynomial **in NTT domain**.
+- `v` = compressed `tᵀ·r + e2 + ⌈q/2⌋·m`, 4 bits/coeff, single polynomial **in NTT domain ??**.
 
 ---
 

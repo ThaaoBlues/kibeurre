@@ -1,21 +1,22 @@
 use std::vec;
 
-use crate::parameters::{n, k,q};
+use crate::parameters::{N, k,Q};
 use crate::ntt;
 
 
-const POLYNOMIAL_SIZE : usize = n;
-pub const EMPTY_VECTOR : [i32;n] = [0;n];
-pub fn empty_vector() -> Vector<n>{
-    Vector::new(&EMPTY_VECTOR,q)
+
+const POLYNOMIAL_SIZE : usize = N;
+pub const EMPTY_VECTOR : [i32;N] = [0;N];
+pub fn empty_vector() -> Vector<N>{
+    Vector::new(&EMPTY_VECTOR,Q)
 }
 
 pub fn empty_polyvector() -> PolyVector<k>{
-    PolyVector::new(&[Vector::new(&EMPTY_VECTOR, q); k],q)
+    PolyVector::new(&[Vector::new(&EMPTY_VECTOR, Q); k],Q)
 }
 
 pub fn empty_polymatrix() -> PolyMatrix<k,k>{
-    PolyMatrix::new([PolyVector::new(&[Vector::new(&EMPTY_VECTOR, q); k],q); k],q)
+    PolyMatrix::new([PolyVector::new(&[Vector::new(&EMPTY_VECTOR, Q); k],Q); k],Q)
 }
 
 #[derive(Copy)]
@@ -48,7 +49,7 @@ impl<const VECTOR_SIZE : usize> Vector<{VECTOR_SIZE}> {
         //let mut tmp : [i32;VECTOR_SIZE] = [0;VECTOR_SIZE];
 
         for i in 0..VECTOR_SIZE {
-            self.c[i] = ((self.c[i] + v2.c[i]) % self.m + self.m) % self.m;
+            self.c[i] = (self.c[i] + v2.c[i]).rem_euclid(Q as i32);
         }
 
         //Vector::new( &tmp);
@@ -187,14 +188,12 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
 
             // get the corresponding polynomial of the second vector and multiply them in NTT form
             let tmp : Vector<POLYNOMIAL_SIZE> = ntt::poly_mult(self.c[poly_index],v2.c[poly_index]);
-            //println!("tmp : {:?}",tmp);
 
             for poly_coef in 0..POLYNOMIAL_SIZE {
-                ret.c[poly_coef] = (((ret.c[poly_coef] + tmp.c[poly_coef]) % self.m) + self.m) % self.m;
+                ret.c[poly_coef] = (ret.c[poly_coef] + tmp.c[poly_coef]).rem_euclid(self.m);
             }
 
         }
-        //println!("ret : {:?}",ret);
         ret
     
     }
@@ -221,6 +220,10 @@ impl<const VECTOR_SIZE : usize> PolyVector<{VECTOR_SIZE}> {
    }
 
 
+
+   pub fn get_coef(&self, poly_index : usize, coef_index : usize)->i32{
+    self.c[poly_index].c[coef_index]
+   }
 
 
 
@@ -543,7 +546,7 @@ impl MontgomeryForm{
 
     // goes back to [0;q] from montgomery form
     pub fn reduction(&mut self) -> i32{
-        let s : i32  = i32::try_from((i64::from(self.a) * i64::from(self.k)) %  i64::from(self.r)).unwrap();
+        let s : i32  = i32::try_from((i64::from(self.a) * i64::from(self.k)).rem_euclid(self.r as i64)).unwrap();
 
 
         let t : i32= self.a + s*self.q;
@@ -566,7 +569,7 @@ impl MontgomeryForm{
 
 
     pub fn to_standard(&mut self)->i32{
-        (self.a * self.r_1) % self.q
+        (self.a * self.r_1).rem_euclid(self.q)
     }
 }
 
@@ -733,10 +736,10 @@ fn test_ntt_dot_with_known_scalars() {
     poly_d[0] = 6;
 
     let v1 = PolyVector {
-        c: [Vector::new(&poly_a, 3329), Vector::new(&poly_b, 3329)],m:q
+        c: [Vector::new(&poly_a, 3329), Vector::new(&poly_b, 3329)],m:Q
     };
     let v2 = PolyVector {
-        c: [Vector::new(&poly_c, 3329), Vector::new(&poly_d, 3329)],m:q
+        c: [Vector::new(&poly_c, 3329), Vector::new(&poly_d, 3329)],m:Q
     };
 
     
@@ -765,10 +768,10 @@ fn test_ntt_dot_modulo_wrap() {
     // 4000 % 3329 = 671
 
     let v1 = PolyVector {
-        c: [Vector::new(&poly_a, 3329), Vector::new(&[0; POLYNOMIAL_SIZE], 3329)],m:q
+        c: [Vector::new(&poly_a, 3329), Vector::new(&[0; POLYNOMIAL_SIZE], 3329)],m:Q
     };
     let v2 = PolyVector {
-        c: [Vector::new(&poly_c, 3329), Vector::new(&[0; POLYNOMIAL_SIZE], 3329)],m:q
+        c: [Vector::new(&poly_c, 3329), Vector::new(&[0; POLYNOMIAL_SIZE], 3329)],m:Q
     };
 
     // Note: Kyber poly_mult handles the multiplication modulo 3329 internally,

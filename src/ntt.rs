@@ -1,6 +1,7 @@
 use crate::math_utils::MontgomeryForm;
 use crate::math_utils::Vector;
 use crate::math_utils::square_and_mult;
+use crate::parameters::{Q,N};
 
 // zeta powers arranged in bit-reversed order
 // /!\ in the kyber reference C code, the array contains the values directly in Montgomery domain
@@ -14,17 +15,17 @@ const ZETA_INV_0  : i32 = 1175;
 
 // Kyber style NTT, stops at degree 1 to use nth unity root
 // returns 128 polynomials => vector still size 256 
-pub fn ntt(p : Vector<256>) -> Vector<256>{
+pub fn ntt(p : Vector<N>) -> Vector<N>{
     
         
 
     // built Montgomery rpz of the vector
 
-    let mut mtg_p: [MontgomeryForm; 256] = [MontgomeryForm::new(0);256];
+    let mut mtg_p: [MontgomeryForm; N] = [MontgomeryForm::new(0);N];
 
    for (i, mtg) in mtg_p.iter_mut().enumerate(){
         mtg.set_n(p.c[i]);
-        mtg.set_a((p.c[i]<<12) % 3329);
+        mtg.set_a((p.c[i]<<12).rem_euclid(Q));
     }
 
 
@@ -35,7 +36,7 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
 
         
         // get chunks of length n/2 + n/2
-        for chunk in (0..256).step_by(2*n_sur_2){
+        for chunk in (0..N).step_by(2*n_sur_2){
 
 
 
@@ -50,13 +51,13 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
 
 
                 let mut a_plus_b = a + b;
-                if(a+b) > 3329 {
-                    a_plus_b = a+b - 3329;
+                if(a+b) > Q {
+                    a_plus_b = a+b - Q;
                 }
 
                 let mut a_moins_b = a - b;
                 if(a-b) < 0 {
-                    a_moins_b = a-b + 3329;
+                    a_moins_b = a-b + Q;
                 }
                 
                 mtg_p[i].set_a(a_plus_b);
@@ -69,14 +70,15 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
     }
 
 
-    let mut reduced_p = [0;256];
 
-    for i in 0..256{
+    let mut reduced_p = [0;N];
+
+    for i in 0..N{
         reduced_p[i] = mtg_p[i].reduction();
     }
 
 
-    Vector::new(&reduced_p, 3329)
+    Vector::new(&reduced_p, Q)
 
     // recursive version
     /*let pe = p.get_even_indexes();
@@ -98,15 +100,15 @@ pub fn ntt(p : Vector<256>) -> Vector<256>{
 
 
 // see end of page 14
-pub fn intt(p : Vector<256>)->Vector<256>{
+pub fn intt(p : Vector<N>)->Vector<N>{
 
     
 
-    let mut mtg_p = [MontgomeryForm::new(0);256];
+    let mut mtg_p = [MontgomeryForm::new(0);N];
 
     for (i,mtg) in mtg_p.iter_mut().enumerate(){
         mtg.set_n(p.c[i]);
-        mtg.set_a((p.c[i]<<12) % 3329);
+        mtg.set_a((p.c[i]<<12).rem_euclid(Q));
     }
 
 
@@ -121,10 +123,11 @@ pub fn intt(p : Vector<256>)->Vector<256>{
 
         // we cannot start from 0 and increment as we did during ntt
         // as in reverse, k starting value is not linear
-        let mut k: usize = 256/(2*n_sur_2) - 1;
+        let mut k: usize = N/(2*n_sur_2) - 1;
 
         // get 2 chunks of length n/2
-        for chunk in (0..256).step_by(2*n_sur_2){
+        for chunk in (0..N).step_by(2*n_sur_2){
+
 
             
             // we still increment k as we are using inverse zeta table
@@ -140,13 +143,13 @@ pub fn intt(p : Vector<256>)->Vector<256>{
                 let a : i32 = mtg_p[i].get_a();
 
                 let mut a_plus_b = a + b;
-                if(a+b) > 3329 {
-                    a_plus_b = a+b - 3329;
+                if(a+b) > Q {
+                    a_plus_b = a+b - Q;
                 }
 
                 let mut a_moins_b = a - b;
                 if(a-b) < 0 {
-                    a_moins_b = a-b + 3329;
+                    a_moins_b = a-b + Q;
                 }
                 
                 mtg_p[i].set_a(a_plus_b);
@@ -163,12 +166,13 @@ pub fn intt(p : Vector<256>)->Vector<256>{
     }
 
 
-    let mut reduced_p = [0;256];
 
-    for i in 0..256{
+    let mut reduced_p = [0;N];
+
+    for i in 0..N{
         reduced_p[i] = mtg_p[i].reduction();
     }
-    let mut ret = Vector::new(&reduced_p, 3329);
+    let mut ret = Vector::new(&reduced_p, Q);
 
     // 128^-1 % 3329 = 3303
     ret.scalar_mult(3303);
@@ -181,25 +185,41 @@ pub fn intt(p : Vector<256>)->Vector<256>{
 Uses NTT to quickly compute the product of two degree 256 polynomials 
 ASSUME BOTH A AND B ARE ALREADY IN NTT FORM
 */
-pub fn poly_mult(ntt_a : Vector<256>, ntt_b : Vector<256>)->Vector<256>{
+pub fn poly_mult(ntt_a : Vector<N>, ntt_b : Vector<N>)->Vector<N>{
 
 
-    let mut ntt_c: Vector<256> = Vector::new(&[0;256], 3329);
+    let mut ntt_c: Vector<N> = Vector::new(&[0;N], Q);
     // step by 2 as standardised kyber NTT returns degree 1 polynomials
     // instead of an array of constants
 
     let mut i    = 0;
-    for zeta in ZETA_TABLE.iter(){
-        let a0 = ntt_a.c[i];
-        let a1 = ntt_a.c[i+1];
-        let b0 = ntt_b.c[i];
-        let b1 = ntt_b.c[i+1];
+    for z_i in 0..64{
 
-        ntt_c.c[i] = a0.wrapping_mul(b0).wrapping_add(zeta.wrapping_mul(a1.wrapping_mul(b1)));
+        let mut a0 = ntt_a.c[i];
+        let mut a1 = ntt_a.c[i+1];
+        let mut b0 = ntt_b.c[i];
+        let mut b1 = ntt_b.c[i+1];
 
-        // x^2 % (x^2+1) = -1
-        // -1 = zeta^n/2 
-        ntt_c.c[i+1] = a0.wrapping_mul(b1).wrapping_add(a1.wrapping_mul(b0));
+        let zeta = ZETA_TABLE[64+z_i]; // bitrev7(2*z_i+1) = 64+z_i
+
+        // degree 1 ring so x^2 loop back with a zeta factor
+        ntt_c.c[i] = (a0 as i64 * b0 as i64 + zeta as i64 * (a1 as i64 * b1 as i64)).rem_euclid(Q as i64) as i32;
+
+        ntt_c.c[i+1] = (a0 as i64 * b1 as i64 + a1 as i64 * b0 as i64).rem_euclid(Q as i64) as i32;
+
+
+        i += 2;
+
+
+        a0 = ntt_a.c[i];
+        a1 = ntt_a.c[i+1];
+        b0 = ntt_b.c[i];
+        b1 = ntt_b.c[i+1];
+
+        // /!\ minus factor as zeta^128 factor is being inserted with bitrev6(2*z_i+1)
+        ntt_c.c[i] = (a0 as i64 * b0 as i64 + (-zeta as i64 * (a1 as i64 * b1 as i64))).rem_euclid(Q as i64) as i32;
+
+        ntt_c.c[i+1] = (a0 as i64 * b1 as i64 + a1 as i64 * b0 as i64).rem_euclid(Q as i64) as i32;
 
 
         i += 2;
@@ -210,14 +230,14 @@ pub fn poly_mult(ntt_a : Vector<256>, ntt_b : Vector<256>)->Vector<256>{
 
 
 
-pub fn compute_zeta_table() -> [i32;128]{
+pub fn compute_zeta_table() -> [i32;N/2]{
 
-    let mut z : [i32;128] = [0;128];
+    let mut z : [i32;N/2] = [0;N/2];
     for i in 0..128u8{
 
         let i_r = i.reverse_bits() >> 1; // /!\ we only need 7 bits to compute powers of 17, as 17^128 = 1 mod 3329
 
-        let res = square_and_mult(ZETA_0 as u32, i_r as u32, 3329) as i32;
+        let res = square_and_mult(ZETA_0 as u32, i_r as u32, Q as u32) as i32;
         //println!("17^{i_r}%3329 = {res}");
         z[ i as usize] = res; // bit reversed order
     
@@ -228,15 +248,15 @@ pub fn compute_zeta_table() -> [i32;128]{
 }
 
 
-pub fn compute_inv_zeta_table() -> [i32;128]{
+pub fn compute_inv_zeta_table() -> [i32;N/2]{
 
-    let mut z : [i32;128] = [0;128];
+    let mut z : [i32;N/2] = [0;N/2];
     for i in 0..128u8{
 
         // /!\ we only need 7 bits to compute powers of 17, as 17^128 = 1 mod 3329
         let i_r = i.reverse_bits() >> 1;
 
-        let res = square_and_mult(ZETA_INV_0 as u32, i_r as u32, 3329) as i32;
+        let res = square_and_mult(ZETA_INV_0 as u32, i_r as u32, Q as u32) as i32;
         println!("17^-{i_r}%3329 = {res}");
         z[ i as usize] = res; // bit reversed order
     
@@ -354,6 +374,33 @@ mod tests {
                 );
             }
         }
+    }
+
+
+#[test]
+fn small_hand_test_poly_mult() {
+    let mut a = [0i32; 256];
+    let mut b = [0i32; 256];
+    a[0] = 3; a[1] = 5;   // a(x) = 3 + 5x
+    b[0] = 7; b[1] = 2;   // b(x) = 7 + 2x
+
+    // a*b = 21 + 6x + 35x + 10x^2 = 21 + 41x + 10x^2
+    let mut expected = [0i32; 256];
+    expected[0] = 21;
+    expected[1] = 41;
+    expected[2] = 10;
+
+    let pa = Vector::new(&a, 3329);
+    let pb = Vector::new(&b, 3329);
+
+    let ntt_a = ntt(pa);
+    let ntt_b = ntt(pb);
+    let ntt_c = poly_mult(ntt_a, ntt_b);
+    let result = intt(ntt_c);
+
+    for i in 0..256 {
+        assert_eq!(result.c[i], expected[i], "coef {} mismatch: got {}, expected {}", i, result.c[i], expected[i]);
+    }
 }
 
 }
