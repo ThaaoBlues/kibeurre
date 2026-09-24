@@ -4,13 +4,15 @@ Kibeurre is a naive kyber implementation written in Rust. The goal of this proje
 
 To try it, just `git clone https://github.com/thaaoblues/kibeurre.git` and `cd kibeurre`, finally `cargo run`.
 
+## current state
+- [x] encryption
+- [x] decryption
+- [x] encapsulation
+- [ ] decapsulation :c
 
 ## TOUDOU 
-- voir si c'est la forme de s ou le nonce qui fait fail le test de génération de t
-- voir pourquoi la decryption foire
-- 
+- encapsulation
 - montgomery multiplication is false ? Not giving the same result as classic one
-- faire les tests sur les vecteurs de tests officiels
 - clean the code
 
 
