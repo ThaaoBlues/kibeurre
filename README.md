@@ -197,7 +197,7 @@ Layout: **`s ‖ pk ‖ H(pk) ‖ z`**  (i.e. `s ‖ t ‖ rho ‖ H(pk) ‖ z`)
 | `z`      | 32   | 64   | fixed |
 | **total sk** | **2400** | **4800** | `2*(k*384) + 96` |
 
-`s` and `t` are (as previous appearance of `t` in `pk`) represented in the **NTT domain ???**  
+`s` and `t` are (as previous appearance of `t` in `pk`) represented in the **NTT domain**  
 
 ---
 
@@ -212,7 +212,7 @@ Layout: **`u ‖ v`** (both **compressed**)
 | **total ct** | **1088** | **2176** | `k*320 + 128` |
 
 - `u` = compressed `NTT⁻¹(Aᵀ∘r) + e1`, 10 bits/coeff, `k` polynomials.
-- `v` = compressed `tᵀ·r + e2 + ⌈q/2⌋·m`, 4 bits/coeff, single polynomial **in NTT domain ??**.
+- `v` = compressed `tᵀ·r + e2 + ⌈q/2⌋·m`, 4 bits/coeff, single polynomial.
 
 ---
 

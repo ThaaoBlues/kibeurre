@@ -161,10 +161,8 @@ pub fn compute_t(mut A : PolyMatrix<k,k>, s : PolyVector<k>, mut e : PolyVector<
 
     // as e is not in NTT domain
     e.c = e.c.map(ntt::ntt);
-    //t.c = t.c.map(ntt::intt);
-    t.add(e);
 
-    //t.c = t.c.map(ntt::ntt);
+    t.add(e);
 
     t
 }
@@ -268,7 +266,7 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<N>,r : Vec<u8
     // generation order is important because of the nonce
     let mut r_ntt : PolyVector<k>;
     (r_ntt,nonce) = generate_noise_polyvector(ETA_1,nonce,&r);
-    r_ntt.c = r_ntt.c.map(ntt::ntt);
+    r_ntt.c = r_ntt.c.map(ntt::ntt); 
     let mut e1 : PolyVector<k>; 
     (e1,nonce) = generate_noise_polyvector(ETA_2,nonce,&r);
     let mut e2 : Vector<N>; 
@@ -276,7 +274,7 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<N>,r : Vec<u8
 
 
     //println!("r_ntt = {:?}",r_ntt);
-    let mut v : Vector<N> = t.ntt_dot(r_ntt);                                // CHECK FUNCTION
+    let mut v : Vector<N> = t.ntt_dot(r_ntt);                                
     //println!("t after ntt dot with rntt : \n {:?}",v);
 
     v = ntt::intt(v);
@@ -288,13 +286,12 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<N>,r : Vec<u8
 
 
     // u := NTT−1(AT◦r) + e1 
-    let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r_ntt);               // CHECK FUNCTION
+    let mut u: PolyVector<k> = A.transpose().ntt_mult_vec(r_ntt);     
 
     //println!("u before ntt : {:?}",u);
 
     u.c = u.c.map(ntt::intt);
     u.add(e1);
-
 
     // u and v returned in the normal domain
     EncryptedMessage { u:compress_polyvector(u,D_U), v:compress(v,D_V) }     // CHECK COMPRESSION ???
@@ -302,21 +299,21 @@ pub fn encrypt(A : PolyMatrix<k,k>,t : PolyVector<k>, msg : Vector<N>,r : Vec<u8
 }
 
 pub fn decrypt(EncryptedMessage { u, v }: & EncryptedMessage, s : PolyVector<k>) -> Vector<N>{
-    // assume u is NORMAL-domain 
+    // assume u and v are in the NORMAL-domain as they should be compressed from a normal domain vector 
+    // s is in the NTT domain
     
     // m = round(v - s^T.u)
-    let mut s_copy = s.clone(); // do not modify s, as it could be used for multiple decryption operations
+    let s_copy = s; // do not modify s, as it could be used for multiple decryption operations
 
     let mut u_decompressed = decompress_polyvector(*u,D_U);
     let mut v_decompressed = decompress(*v,D_V);
 
-    // do not modify s, as it could be used for multiple decryption operations
-    //v.sub(s_copy.ntt_dot(*u));
-    //return round(*v);
-    u_decompressed.c = u_decompressed.c.map(ntt::ntt);
     v_decompressed = ntt::ntt(v_decompressed);
-    s_copy.c = s_copy.c.map(ntt::ntt);
+
+    u_decompressed.c = u_decompressed.c.map(ntt::ntt);
+
     v_decompressed.sub(    s_copy.ntt_dot(u_decompressed));
+    //
     v_decompressed = ntt::intt(v_decompressed);
     round(v_decompressed)
 }
@@ -355,8 +352,7 @@ pub fn decapsulate(c : EncryptedMessage, PrivateKey { s, pk, hashed_pk, z }: Pri
 
     // m = round(v - s^T.u)
 
-    let msg = decrypt(&c, s); // verif si ça fonctionne 
-
+    let msg = decrypt(&c, s); 
     // G(m || H(pk))
     let mut G = sha3::Sha3_512::new();
     sha3::Digest::update(&mut G, msg.encode(1));
@@ -366,19 +362,16 @@ pub fn decapsulate(c : EncryptedMessage, PrivateKey { s, pk, hashed_pk, z }: Pri
 
     let sigma = buf[32..].to_vec();
 
-    let c_p = encrypt(pk.A, pk.t, msg,sigma);
 
-    println!("c_p.u == c.u: {}", c_p.u == c.u);
-    println!("c_p.v == c.v: {}", c_p.v == c.v);
-    //let hashed_c = hash_c(c.clone());
+    let c_p: EncryptedMessage = encrypt(pk.A, pk.t, msg,sigma);
 
-    /*if c_p == c {
+    let hashed_c = hash_c(c.clone());
+
+    if c_p == c {
         KDF(K_b, hashed_c)
     } else {
         KDF(z, hashed_c)
-    }*/
-
-    KDF(K_b, hash_c(c))
+    }
 }
 
 pub fn encapsulate(pk: &PublicKey, msg : Vector<N>) -> (EncryptedMessage, Vec<u8>){

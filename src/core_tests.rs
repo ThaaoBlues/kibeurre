@@ -167,12 +167,12 @@ use super::*;
         for tc in test_cases {
             //println!("Running test case: {:?}", tc);
 
-            let A  = generate_A_from_seed(&tc.rho);
+            let A  = generate_A_from_seed(&tc.rho); // checked
 
             let mut encrypted_message = EncryptedMessage { u: tc.ct.0, v: tc.ct.1 };
             let pub_key = PublicKey { A, t: tc.t, rho: tc.rho };
             let mut rng = NistPqcAes256CtrRng::from_seed(tc.rng_seed[..48].try_into().unwrap());
-            let z = generate_d_and_z(&mut rng).1;
+            let z = generate_d_and_z(&mut rng).1; // checked
 
 
             //good up until here
